@@ -1,5 +1,4 @@
 {
-  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "win11-modern-tools",
-  "description": "Universal Windows 11 modern CLI toolchain (rg, fd, ast-grep, tokei, xsv, sqlite3, xh, dust, jq, yq, bat, sd, pdftotext, duckdb, actionlint, hyperfine, pwsh / PowerShell 7, Vite+), subshell stdin safety, token discipline, and git commit guard."
+  "description": "Universal Windows 11 modern CLI toolchain (rg, fd, ast-grep, tokei, xsv, sqlite3, xh, dust, jq, yq, bat, sd, shfmt, pdftotext, duckdb, actionlint, hyperfine, pwsh / PowerShell 7, Vite+), subshell stdin safety, token discipline, and git commit guard."
 }

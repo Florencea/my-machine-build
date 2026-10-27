@@ -27,5 +27,5 @@ The repository provides automated, idempotent environment provisioning across **
 ## 2. Idempotency & Formatting Standards
 
 - All shell configurations and installer tasks must be idempotent (safe to run repeatedly without duplicate `PATH` entries or side effects).
-- Format Zsh/Bash files with: `shfmt -i 2 -ci -w <file>`
-- Verify PowerShell AST syntax with `pwsh -NoLogo -NoProfile`.
+- Format Zsh/Bash files with: `shfmt -i 2 -ci -w <file>` (installed on both macOS via Homebrew and Windows 11 via WinGet `mvdan.shfmt`).
+- Format PowerShell files with `Invoke-Formatter` (`PSScriptAnalyzer`, LF `\n`, UTF-8 without BOM) and verify AST syntax with `pwsh -NoLogo -NoProfile`.

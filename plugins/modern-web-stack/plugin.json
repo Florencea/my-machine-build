@@ -1,5 +1,4 @@
 {
-  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "modern-web-stack",
   "description": "Cross-platform modern web development bundle: Node.js (Active LTS), TypeScript 5+, React 19, Tailwind CSS v4, TanStack Router, Vitest Browser testing, and GitHub Actions CI rules and skills."
 }

@@ -113,26 +113,26 @@ if (-not $SkipVite) {
 # 3. Sync Git projects in workspace in parallel
 if (-not $SkipGit) {
     $repos = @(Get-ChildItem -Directory -LiteralPath $PROJECTS_DIR | Where-Object {
-        Test-Path -LiteralPath (Join-Path $_.FullName '.git')
-    })
+            Test-Path -LiteralPath (Join-Path $_.FullName '.git')
+        })
 
     $total = $repos.Count
     if ($total -gt 0) {
         $results = @($repos | ForEach-Object -Parallel {
-            $dir = $_.FullName
-            $name = $_.Name
-            $pullOut = @(& git -C $dir pull --all 2>&1)
-            $isSuccess = ($LASTEXITCODE -eq 0)
-            $outText = $pullOut -join "`n"
-            $isUpdated = ($outText -match 'Updating |Fast-forward')
+                $dir = $_.FullName
+                $name = $_.Name
+                $pullOut = @(& git -C $dir pull --all 2>&1)
+                $isSuccess = ($LASTEXITCODE -eq 0)
+                $outText = $pullOut -join "`n"
+                $isUpdated = ($outText -match 'Updating |Fast-forward')
 
-            [PSCustomObject]@{
-                Name    = $name
-                Success = $isSuccess
-                Updated = $isUpdated
-                Output  = $outText
-            }
-        } -ThrottleLimit 6)
+                [PSCustomObject]@{
+                    Name    = $name
+                    Success = $isSuccess
+                    Updated = $isUpdated
+                    Output  = $outText
+                }
+            } -ThrottleLimit 6)
 
         $updatedCount = @($results | Where-Object { $_.Updated }).Count
         $failedCount = @($results | Where-Object { -not $_.Success }).Count

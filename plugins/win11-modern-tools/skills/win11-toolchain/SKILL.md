@@ -1,6 +1,6 @@
 ---
 name: win11-toolchain
-description: Pre-installed high-performance Windows 11 CLI tools (rg, fd, ast-grep, tokei, xsv, sqlite3, xh, dust, jq, yq, bat, sd, pdftotext, duckdb, actionlint, hyperfine, pwsh / PowerShell 7), Vite+ toolchain (vp, vpx, vpr), PowerShell execution safety, and live query endpoints. Use when running terminal commands, inspecting docs/PDFs, or refactoring code on Windows 11.
+description: Pre-installed high-performance Windows 11 CLI tools (rg, fd, ast-grep, tokei, xsv, sqlite3, xh, dust, jq, yq, bat, sd, shfmt, pdftotext, duckdb, actionlint, hyperfine, pwsh / PowerShell 7), Vite+ toolchain (vp, vpx, vpr), PowerShell execution safety, and live query endpoints. Use when running terminal commands, inspecting docs/PDFs, or refactoring code on Windows 11.
 compatibility: Windows 11, PowerShell 7+, Vite+
 ---
 

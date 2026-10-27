@@ -28,7 +28,7 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
 ## 2. Manifest & File Specifications
 
 - **Plugin Manifest (`plugins/<plugin-name>/plugin.json`)**:
-  - Include `"$schema": "https://antigravity.google/schemas/v1/plugin.json"`.
+  - Do NOT include remote `"$schema"` URLs.
   - Required fields: `name` (lowercase kebab-case matching folder name), `description`.
 - **Plugin Rules (`plugins/<plugin-name>/rules/AGENTS.md`)**:
   - Plain Markdown **without YAML frontmatter** (continuously active while the plugin is enabled).

@@ -19,6 +19,7 @@
   - JSON inspection & transformation: `jq -c "<filter>" <file>` (prefer compact `-c` output)
   - YAML / XML / TOML inspection & editing: `yq "<filter>" <file>` (supports `-i` for in-place updates)
   - PDF text inspection: `pdftotext -f <start> -l <end> <file.pdf> -`
+  - Shell script formatting: `shfmt -i 2 -ci -w <file>`
   - CI workflow validation: `actionlint` locally before staging `.github/workflows/*.yml`
   - Unified Node.js & Frontend Toolchain: `vp`, `vpx <tool>` (e.g., `vpx oxfmt`, `vpx oxlint`), `vpr <script>`
 - **Zero Throwaway Script Policy (No Scratch File Pollution)**:

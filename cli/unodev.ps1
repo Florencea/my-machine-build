@@ -57,9 +57,9 @@ $nodeVersion = $currentLocalVersion.TrimStart('v')
 
 $projectsDir = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $projects = @(Get-ChildItem -Directory -LiteralPath $projectsDir | Where-Object {
-    (Test-Path -LiteralPath (Join-Path $_.FullName '.git')) -and
-    (Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') -PathType Leaf)
-})
+        (Test-Path -LiteralPath (Join-Path $_.FullName '.git')) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') -PathType Leaf)
+    })
 
 $projects | ForEach-Object -Parallel {
     $projDir = $_.FullName

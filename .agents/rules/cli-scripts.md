@@ -41,9 +41,12 @@ description: Rules for managing, authoring, and verifying cross-platform PowerSh
 
 ---
 
-## 4. AST Syntax Verification
+## 4. Cross-Platform Formatting & AST Syntax Verification
 
-- Before staging any `cli/*.ps1` changes, verify zero syntax errors using the PowerShell language parser:
-  ```bash
-  pwsh -NoLogo -NoProfile -Command '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("cli/<command>.ps1", [ref]$null, [ref]$errors); if ($errors) { $errors; exit 1 }'
-  ```
+- **Formatting (`PSScriptAnalyzer` / `ms-vscode.powershell`)**:
+  - Format all `.ps1` scripts using `Invoke-Formatter` (`PSScriptAnalyzer`) and save with LF (`\n`) line endings and UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang works identically across macOS and Windows 11.
+- **AST Syntax Verification**:
+  - Before staging any `cli/*.ps1` changes, verify zero syntax errors using the PowerShell language parser:
+    ```bash
+    pwsh -NoLogo -NoProfile -Command '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("cli/<command>.ps1", [ref]$null, [ref]$errors); if ($errors) { $errors; exit 1 }'
+    ```

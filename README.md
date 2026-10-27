@@ -527,6 +527,7 @@ winget install --id jqlang.jq -e
 winget install --id MikeFarah.yq -e
 winget install --id sharkdp.bat -e
 winget install --id chmln.sd -e
+winget install --id mvdan.shfmt -e
 winget install --id oschwartz10612.Poppler -e
 winget install --id XAMPPRocky.Tokei -e
 winget install --id BurntSushi.xsv.MSVC -e
