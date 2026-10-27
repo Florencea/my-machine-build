@@ -307,8 +307,8 @@ $currentUserPath = @()
 if ($rawUserPath) {
     $currentUserPath = @(
         $rawUserPath -split ';' |
-            ForEach-Object { $_.Trim().TrimEnd('\') } |
-            Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+        ForEach-Object { $_.Trim().TrimEnd('\') } |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_) }
     )
 }
 

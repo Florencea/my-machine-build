@@ -75,13 +75,13 @@ function Save-CommitFile {
 
 function Backup-RawFile {
     param([string]$Pattern, [string]$TargetName)
-    $matches = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($matches.Count -gt 0) {
-        $latest = $matches[0].FullName
+    $matchedFiles = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
+    if ($matchedFiles.Count -gt 0) {
+        $latest = $matchedFiles[0].FullName
         $dest = Join-Path $configHome $TargetName
         Move-Item -LiteralPath $latest -Destination $dest -Force
-        if ($matches.Count -gt 1) {
-            foreach ($old in $matches[1..($matches.Count - 1)]) {
+        if ($matchedFiles.Count -gt 1) {
+            foreach ($old in $matchedFiles[1..($matchedFiles.Count - 1)]) {
                 Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
             }
         }
@@ -91,9 +91,9 @@ function Backup-RawFile {
 
 function Backup-JsonFile {
     param([string]$Pattern, [string]$TargetName)
-    $matches = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($matches.Count -gt 0) {
-        $latest = $matches[0].FullName
+    $matchedFiles = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
+    if ($matchedFiles.Count -gt 0) {
+        $latest = $matchedFiles[0].FullName
         $dest = Join-Path $configHome $TargetName
         $formatted = @(& jq . $latest 2>$null)
         if ($LASTEXITCODE -eq 0 -and $formatted.Count -gt 0) {
@@ -102,7 +102,7 @@ function Backup-JsonFile {
         else {
             Move-Item -LiteralPath $latest -Destination $dest -Force
         }
-        foreach ($m in $matches) {
+        foreach ($m in $matchedFiles) {
             if (Test-Path -LiteralPath $m.FullName) {
                 Remove-Item -LiteralPath $m.FullName -Force -ErrorAction SilentlyContinue
             }
