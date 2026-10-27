@@ -1,7 +1,12 @@
 #compdef ua
 
 _ua() {
-  _message 'no arguments'
+  _arguments -s \
+    '--skip-brew[Skip Homebrew upgrade (macOS)]' \
+    '--skip-winget[Skip winget upgrade (Windows)]' \
+    '--skip-vite[Skip Vite+ and Node.js LTS update]' \
+    '--skip-git[Skip workspace Git repositories sync]' \
+    '(-h --help)'{-h,--help}'[Show help message]'
 }
 
 _ua "$@"

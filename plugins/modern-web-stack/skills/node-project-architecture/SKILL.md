@@ -39,9 +39,9 @@ Avoid monolithic, multi-thousand-line `AGENTS.md` files at the project root. Ins
 ```
 
 > [!NOTE]
-> **Global vs Local Rules Division**:
+> **Global Plugins vs Local Rules Division**:
 >
-> - **Global Rules** (`~/.gemini/config/rules/`): Enforce machine-wide standards: macOS execution invariants, strict TypeScript safety, modern Node.js runtime behavior, React 19 / Tailwind v4 standards, GitHub Actions CI actionlint verification (`ci-workflows.md`), and Vitest testing standards (`modern-testing.md`).
+> - **Global Plugins** (`~/.gemini/config/plugins/`): Enforce machine-wide standards via platform plugins (`macos-modern-tools` / `win11-modern-tools`) and the shared `modern-web-stack` plugin (strict TypeScript safety, modern Node.js runtime behavior, React 19 / Tailwind v4 standards, GitHub Actions CI `actionlint` verification, and Vitest testing standards).
 > - **Local Rules** (`.agents/rules/`): Enforce project-unique domain concerns (e.g. database schema migrations, specific routing topologies, domain localization, chess/game engines).
 
 ---

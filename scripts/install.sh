@@ -195,47 +195,48 @@ else
   done
 fi
 
-local -a rules=()
-if [[ -d "$REPO_DIR/configs/rules" ]]; then
-  for rule_file in "$REPO_DIR/configs/rules"/*.md(N); do
-    rules+=("${rule_file:t:r}")
-  done
-fi
+# 7.5 Deploy Antigravity Plugins (macos-modern-tools & modern-web-stack)
+sync_plugin_dir() {
+  local plugin_name="$1"
+  local src_dir="$REPO_DIR/plugins/$plugin_name"
+  local dest_dir="$HOME/.gemini/config/plugins/$plugin_name"
 
-if ((${#rules[@]} == 0)); then
-  rules=(ci-workflows macos-execution modern-nodejs modern-react-tailwind modern-testing modern-typescript)
-fi
-
-mkdir -p "$HOME/.gemini/config/rules"
-for rule in "${rules[@]}"; do
-  fetch_file "configs/rules/$rule.md" "$HOME/.gemini/config/rules/$rule.md"
-done
-
-local -a skills=()
-if [[ -d "$REPO_DIR/configs/skills" ]]; then
-  for skill_dir in "$REPO_DIR/configs/skills"/*(/N); do
-    skills+=("${skill_dir:t}")
-  done
-fi
-
-if ((${#skills[@]} == 0)); then
-  skills=(macos-toolchain modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
-fi
-
-for skill in "${skills[@]}"; do
-  local target_dir="$HOME/.gemini/config/skills/$skill"
-  mkdir -p "$target_dir"
-  if [[ -n "${REPO_DIR:-}" && -d "$REPO_DIR/configs/skills/$skill" ]]; then
-    for f in "$target_dir"/*(N@); do
-      rm -f "$f"
-    done
-    cp -R "$REPO_DIR/configs/skills/$skill/." "$target_dir/"
+  mkdir -p "$dest_dir"
+  if [[ -n "${REPO_DIR:-}" && -d "$src_dir" ]]; then
+    rm -rf "$dest_dir"
+    mkdir -p "$dest_dir"
+    cp -R "$src_dir/." "$dest_dir/"
   else
-    fetch_file "configs/skills/$skill/SKILL.md" "$target_dir/SKILL.md"
+    fetch_file "plugins/$plugin_name/plugin.json" "$dest_dir/plugin.json"
+    fetch_file "plugins/$plugin_name/rules/AGENTS.md" "$dest_dir/rules/AGENTS.md"
   fi
-done
+}
 
-# 8. Setup CLI Symlinks
+sync_plugin_dir "macos-modern-tools"
+sync_plugin_dir "modern-web-stack"
+
+if [[ ! -d "$REPO_DIR/plugins" ]]; then
+  fetch_file "plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md" "$HOME/.gemini/config/plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md"
+  local -a web_skills=(modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
+  for skill in "${web_skills[@]}"; do
+    fetch_file "plugins/modern-web-stack/skills/$skill/SKILL.md" "$HOME/.gemini/config/plugins/modern-web-stack/skills/$skill/SKILL.md"
+  done
+fi
+
+# Clean up legacy standalone rules and skills migrated into plugins
+local -a legacy_rules=(ci-workflows macos-execution modern-nodejs modern-react-tailwind modern-testing modern-typescript)
+for rule in "${legacy_rules[@]}"; do
+  rm -f "$HOME/.gemini/config/rules/$rule.md"
+done
+rmdir "$HOME/.gemini/config/rules" 2>/dev/null || true
+
+local -a legacy_skills=(macos-toolchain modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
+for skill in "${legacy_skills[@]}"; do
+  rm -rf "$HOME/.gemini/config/skills/$skill"
+done
+rmdir "$HOME/.gemini/config/skills" 2>/dev/null || true
+
+# 8. Setup CLI Symlinks (PowerShell 7 CLI scripts)
 CLI_DIR=""
 if [[ -n "${REPO_DIR:-}" && -d "$REPO_DIR/cli" ]]; then
   CLI_DIR="$REPO_DIR/cli"
@@ -245,8 +246,8 @@ fi
 
 if [[ -n "$CLI_DIR" ]]; then
   mkdir -p "$HOME/.local/bin"
-  chmod +x "$CLI_DIR"/*.sh(N)
-  for script in "$CLI_DIR"/*.sh(N); do
+  chmod +x "$CLI_DIR"/*.ps1(N)
+  for script in "$CLI_DIR"/*.ps1(N); do
     cmd_name="${script:t:r}"
     ln -sf "$script" "$HOME/.local/bin/$cmd_name"
   done
@@ -427,6 +428,7 @@ install_formulas \
   hyperfine \
   jq \
   mtr \
+  powershell \
   ripgrep \
   sd \
   shfmt \
@@ -497,6 +499,7 @@ configure_antigravity_permissions() {
     "command(ls)"
     "command(printf)"
     "command(pwd)"
+    "command(pwsh)"
     "command(readlink)"
     "command(realpath)"
     "command(rg)"

@@ -1,0 +1,30 @@
+[user]
+	name = Florencea
+	email = bearflorencea@gmail.com
+[core]
+	editor = code --wait
+	quotepath = false
+	longpaths = true
+	autocrlf = false
+	sshCommand = C:/Windows/System32/OpenSSH/ssh.exe
+	fsmonitor = true
+	untrackedcache = true
+[http]
+	sslBackend = schannel
+[init]
+	defaultBranch = main
+[push]
+	autoSetupRemote = true
+[pull]
+	rebase = false
+[fetch]
+	prune = true
+[color]
+	ui = auto
+[alias]
+	st = status -sb
+	co = checkout
+	br = branch
+	ci = commit
+	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+	remote-init = "!f() { name=$(basename $(pwd)); remote=$HOME/Documents/_GitRemote/${name}.git; git init --bare \"$remote\" && git remote add origin \"$remote\" && git push -u origin --all && git push origin --tags; }; f"

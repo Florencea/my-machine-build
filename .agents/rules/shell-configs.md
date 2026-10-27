@@ -1,36 +1,31 @@
 ---
 trigger: glob
-globs: "configs/bash/*, configs/zsh/*, scripts/*.sh"
-description: Rules for shell configuration parity and installer script idempotency.
+globs: "configs/bash/*, configs/zsh/*, scripts/*.sh, scripts/*.ps1"
+description: Rules for shell configuration parity and cross-platform installer script idempotency.
 ---
 
-# Shell Configuration & Installer Rules
+# Shell Configuration & Cross-Platform Installer Rules
 
-## 1. Directory Layout & Shell Parity
+## 1. Directory Layout & Platform Installers
 
-The repository provides unified environment parity across **Zsh** and **Bash**:
+The repository provides automated, idempotent environment provisioning across **macOS** and **Windows 11**:
 
-- **Directory Layout**:
+- **macOS Shell Configs**:
   - `configs/bash/`: `bash_profile`, `bashrc` (deployed to `~/.bash_profile`, `~/.bashrc`).
-  - `configs/zsh/`: `zshenv`, `zprofile`, `zshrc` (deployed to `~/.zshenv`, `~/.zprofile`, `~/.zshrc`).
-- **Toolchain Alignment**:
-  - **Homebrew**: Initialize `brew shellenv`.
-  - **PATH Priority**: Prepend `$HOME/.local/bin` and `$HOME/.local/share/vite-plus/bin`.
-  - **Node.js**: Managed globally via Vite+ (`vp` CLI, `vpr` task runner). Tasks are executed using `vp run` or `vpr`.
-  - **Aliases**: Maintain common shortcuts (`nr`, `la`, `ll`).
+  - `configs/zsh/`: `zshenv`, `zprofile`, `zshrc`, `completions/_*` (deployed to `~/.zshenv`, `~/.zprofile`, `~/.zshrc`, `~/.local/share/zsh/site-functions/`).
+- **macOS Installer (`scripts/install.sh`)**:
+  - Written in idiomatic Zsh (`#!/bin/zsh`, `emulate -L zsh`, `set -euo pipefail`).
+  - Bootstraps Homebrew, installs `powershell` (`pwsh`) and modern CLI formulas/casks, links `cli/*.ps1` to `~/.local/bin/<cmd>`, and deploys `macos-modern-tools` + `modern-web-stack` plugins to `~/.gemini/config/plugins/`.
+- **Windows 11 Installer (`scripts/install.ps1`)**:
+  - Must be **strictly compatible with both Windows PowerShell 5.1 (`powershell.exe`, default on fresh Windows 11) and PowerShell 7+ (`pwsh.exe`)**.
+  - **Prohibited in `scripts/install.ps1`**: Never use PowerShell 7-only operators (`? :`, `??`, `??=`, `?.`, `&&`, `||`, `ForEach-Object -Parallel`, `ConvertFrom-Json -AsHashtable`).
+  - Always write UTF-8 files without BOM using `[System.IO.File]::WriteAllText($path, $content, (New-Object System.Text.UTF8Encoding($false)))`.
+  - Deploys `win11-modern-tools` + `modern-web-stack` plugins to `$HOME\.gemini\config\plugins\` and registers `cli/` in User `PATH`.
 
 ---
 
-## 2. Idempotency Standards
+## 2. Idempotency & Formatting Standards
 
-- All shell configurations and installer tasks must be idempotent (safe to run repeatedly without duplicate `$PATH` entries or side effects).
-- In Zsh, enforce uniqueness using `typeset -U path PATH`.
-- In Bash, check before prepending: `[[ ":$PATH:" != *":$p:"* ]]`.
-- In `scripts/install.sh`, use `fetch_file` or overwrite semantics rather than unbounded appends.
-
----
-
-## 3. Code Formatting
-
-- Formatter: `shfmt`
-- Command: `shfmt -i 2 -ci -w <file>`
+- All shell configurations and installer tasks must be idempotent (safe to run repeatedly without duplicate `PATH` entries or side effects).
+- Format Zsh/Bash files with: `shfmt -i 2 -ci -w <file>`
+- Verify PowerShell AST syntax with `pwsh -NoLogo -NoProfile`.

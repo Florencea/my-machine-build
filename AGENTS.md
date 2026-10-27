@@ -1,35 +1,34 @@
 # Agent Guidelines & Workflow Rules
 
-This document outlines the core development workflow, code formatting standards, and commit rules for AI agents operating in this repository.
+This document outlines the core development workflow, code formatting standards, and commit rules for AI agents operating in this unified cross-platform (macOS + Windows 11) repository.
 
 ## 1. Quick Architecture Map
 
-| Layer               | Path                            | Responsibility                                                      |
-| :------------------ | :------------------------------ | :------------------------------------------------------------------ |
-| **CLI Tools**       | `cli/*.sh`                      | Executable user-facing shell commands (symlinked to `~/.local/bin`) |
-| **Dotfiles**        | `configs/bash/`, `configs/zsh/` | Shell configuration parity, aliases, and completions                |
-| **Global Rules**    | `configs/rules/`                | Global Antigravity rules deployed to `~/.gemini/config/rules/`      |
-| **Global Skills**   | `configs/skills/`               | Global Antigravity skills deployed to `~/.gemini/config/skills/`    |
-| **Installer**       | `scripts/install.sh`            | Idempotent macOS environment setup and dotfile installer            |
-| **Workspace Rules** | `.agents/rules/`                | Modular project rules triggered via file globbing                   |
+| Layer                   | Path                                            | Responsibility                                                                                                 |
+| :---------------------- | :---------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
+| **CLI Tools**           | `cli/*.ps1`                                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands (symlinked to `~/.local/bin` on macOS; User `PATH` on Win11) |
+| **Dotfiles & Configs**  | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                       |
+| **Antigravity Plugins** | `plugins/`                                      | Platform & web stack bundles (`macos-modern-tools`, `win11-modern-tools`, `modern-web-stack`)                  |
+| **Installers**          | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                 |
+| **Workspace Rules**     | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                              |
 
 ---
 
 ## 2. Git Commit & Command Execution Rules
 
 - **AI Direct Commits Globally Prohibited**:
-  - The entire machine enforces a global Git hook (`~/.config/git/hooks/pre-commit`) and global rule `macos-execution.md` (`always_on`) that reject direct commits by AI agents (`ANTIGRAVITY_AGENT=1`).
-  - Agents must **never** execute `git commit`.
+  - The system enforces a global Git hook (`~/.config/git/hooks/pre-commit`) that rejects direct commits by AI agents (`ANTIGRAVITY_AGENT=1`).
+  - Agents must **never** execute `git commit` or `git push`.
   - Mandatory workflow for agents:
-    1. Apply code changes and verify.
-    2. Format modified files (`shfmt` for shell scripts, `vpx oxfmt` for markdown/code).
+    1. Apply code changes and verify syntax/AST.
+    2. Format modified files (`shfmt` for shell scripts, `vpx oxfmt` for markdown/JSON/code).
     3. Stage changes using `git add <files>`.
     4. Provide the exact `git commit -m "..."` command for manual execution by the user.
 - **Unified Vite+ Toolchain Mandate (`vp`, `vpx`, `vpr`)**:
   - Across all Node.js projects, always use native Vite+ commands: `vp` for package/project management, `vpx <tool>` for one-off tool execution, and `vpr <script>` (or `vp run <script>`) for package scripts.
   - STRICTLY PROHIBITED to invoke package-manager specific runners like `npx`, `pnpm dlx`, `bunx`, or `npm run`.
 - **Bare Command Invocation (No Path Prefixes)**:
-  - All terminal commands executed by agents must strictly use bare command names (e.g. `git`, `vp`, `node`, `shfmt`) without absolute path prefixes (e.g. NEVER `/usr/bin/git`).
+  - All terminal commands executed by agents must strictly use bare command names (e.g. `git`, `vp`, `pwsh`, `node`, `shfmt`) without absolute path prefixes (e.g. NEVER `/usr/bin/git`).
   - Commands rely on `$PATH` to ensure compatibility with Antigravity security allowlists.
 - **Agent-Friendly Execution Formats**:
   - When running verification, tests, or inspection commands, always prefer token-efficient structured flags over decorative terminal UI:
@@ -41,16 +40,19 @@ This document outlines the core development workflow, code formatting standards,
 - **Commit Message Convention**:
   - Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
   - Common types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`.
-  - Common scopes: `cli`, `configs`, `docs`, `skills`, `rules`.
+  - Common scopes: `cli`, `configs`, `docs`, `plugins`, `rules`.
 
 ---
 
-## 3. Code Formatting Standards
+## 3. Code Formatting & Verification Standards
 
-Before staging any files, all modified files must be formatted:
+Before staging any files, all modified files must be formatted and verified:
 
-- **Shell Scripts** (`cli/*.sh`, `scripts/*.sh`, `configs/bash/*`, `configs/zsh/*`):
+- **Shell Scripts** (`scripts/*.sh`, `configs/bash/*`, `configs/zsh/*`):
   - Formatter: `shfmt -i 2 -ci -w <files>`
+- **PowerShell Scripts** (`cli/*.ps1`, `scripts/install.ps1`):
+  - AST Verification: Verify zero syntax errors using `[System.Management.Automation.Language.Parser]::ParseFile(...)` via `pwsh -NoLogo -NoProfile`.
+  - Note: `scripts/install.ps1` must remain strictly compatible with both Windows PowerShell 5.1 and PowerShell 7+.
 - **Markdown & Code Files** (`*.md`, `*.json`, `*.ts`):
   - Formatter: `vpx oxfmt <files>`
 
@@ -67,18 +69,14 @@ Before staging any files, all modified files must be formatted:
 ## 5. Technical Authoring & Code Quality Standards
 
 - **Live Documentation & Configuration Pre-Verification**:
-  - Before authoring or refactoring skills, technical rules, tool configurations, or package manager settings (`package.json`, `tsconfig*.json`, `vite.config.*`, `.oxlintrc.json`, `pnpm-workspace.yaml`), agents MUST query authoritative endpoints (`search_web`, `https://oxc.rs/llms.txt`, `https://viteplus.dev/llms-full.txt`, `<tool> --help`).
+  - Before authoring or refactoring plugins, skills, technical rules, PowerShell scripts, tool configurations, or package manager settings, agents MUST query authoritative endpoints (`webread`, `search_web`, `https://antigravity.google/docs/plugins`, `https://oxc.rs/llms.txt`, `https://viteplus.dev/llms-full.txt`, `<tool> --help`).
   - Never guess schemas, flags, or configuration syntax solely from pre-training memory.
 - **Zero Suppression Directives Policy**:
   - NEVER use `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, `/* oxlint-disable */`, `/* eslint-disable */`, or `// biome-ignore` to bypass type or lint errors.
-  - Never relax configuration rules to make faulty code compile. All errors must be resolved structurally.
 - **Zod-First Runtime Validation**:
   - Boundary data (API responses, `JSON.parse`, file configs, `process.env`) must be parsed via Zod `safeParse`.
-  - Derive static types using `z.infer<typeof Schema>`.
-  - Strictly avoid `as unknown as Type` or unvalidated type smuggling.
 - **No Fragile Version Pinning**:
-  - Never hardcode minor or patch versions (e.g. avoid `0.15+`, `v1.2.3`). Reference major generations or LTS branches instead (e.g. `Node.js (Active LTS)`, `TypeScript 5+`, `Vite+`).
-  - Instruct tools and users to query versions dynamically via `<tool> --version` or `<tool> --help`.
+  - Never hardcode minor or patch versions (e.g. avoid `0.15+`, `v1.2.3`). Reference major generations or LTS branches instead (e.g. `Node.js (Active LTS)`, `TypeScript 5+`, `PowerShell 7+`, `Vite+`).
 
 ---
 
@@ -86,6 +84,6 @@ Before staging any files, all modified files must be formatted:
 
 To keep this document lean, domain-specific rules are modularized and automatically injected via file globbing:
 
-- **CLI Scripts**: [`.agents/rules/cli-scripts.md`](./.agents/rules/cli-scripts.md) (triggers on `cli/*.sh`)
-- **Shell & Installer**: [`.agents/rules/shell-configs.md`](./.agents/rules/shell-configs.md) (triggers on `configs/bash/*`, `configs/zsh/*`, `scripts/*.sh`)
-- **Skills & Rules**: [`.agents/rules/skills-authoring.md`](./.agents/rules/skills-authoring.md) (triggers on `configs/skills/**`, `configs/rules/**`)
+- **CLI Scripts**: [`.agents/rules/cli-scripts.md`](./.agents/rules/cli-scripts.md) (triggers on `cli/*.ps1`)
+- **Shell & Installers**: [`.agents/rules/shell-configs.md`](./.agents/rules/shell-configs.md) (triggers on `configs/bash/*`, `configs/zsh/*`, `scripts/*`)
+- **Plugins, Skills & Rules**: [`.agents/rules/skills-authoring.md`](./.agents/rules/skills-authoring.md) (triggers on `plugins/**`)
