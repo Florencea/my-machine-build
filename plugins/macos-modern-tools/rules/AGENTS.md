@@ -66,7 +66,7 @@
 - **Zsh Indexing & Modifiers**: Zsh arrays are **1-based** (`$arr[1]`). Prefer native modifiers: `${file:A}` (abs), `${file:h}` (dir), `${file:t}` (name), `${file:e}` (ext), `${file:r:t}` (basename).
 - **PowerShell 7 (`pwsh`) Cross-Platform CLI Scripts**:
   - Cross-platform CLI tools in `cli/*.ps1` use `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` and are symlinked without extension into `~/.local/bin`.
-  - Support both PowerShell (`-Flag`) and POSIX/GNU (`--flag`, `-h`, `--help`) parameters via `ValueFromRemainingArguments`.
+  - Parse `$args` directly (avoiding `[CmdletBinding()]` CommonParameters collisions) to support both PowerShell (`-Flag`) and POSIX/GNU (`--flag`, `-h`, `--help`) parameters, and resolve extensionless symlink paths via `[Environment]::GetCommandLineArgs()` + `ResolveLinkTarget($true)` when `$PSScriptRoot` is empty.
 
 ---
 

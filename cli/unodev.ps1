@@ -6,15 +6,6 @@
     Cross-platform workspace engines.node synchronizer for macOS and Windows 11 (PowerShell 7).
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -26,17 +17,33 @@ Usage: unodev
 "@
 }
 
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        Show-Help
+        exit 0
     }
 }
 
-if ($Help) {
-    Show-Help
-    exit 0
+function Get-ScriptDirectory {
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) {
+        $cmdArgs = [Environment]::GetCommandLineArgs()
+        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
+            $candidate = $cmdArgs[$i]
+            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                $scriptPath = $candidate
+                break
+            }
+        }
+    }
+    if (-not $scriptPath) {
+        throw 'Unable to determine script path.'
+    }
+    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
+    $targetInfo = $fileInfo.ResolveLinkTarget($true)
+    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
+    return (Split-Path -Parent $realPath)
 }
 
 foreach ($cmd in @('git', 'vp')) {
@@ -51,11 +58,13 @@ $currentLocalVersion = (& vp node -v 2>$null)
 if (-not $currentLocalVersion) {
     $currentLocalVersion = (& node -v 2>$null)
 }
+$currentLocalVersion = [string]$currentLocalVersion
 $currentLocalVersion = $currentLocalVersion.Trim()
 Write-Output "`nnode: $currentLocalVersion`n"
 $nodeVersion = $currentLocalVersion.TrimStart('v')
 
-$projectsDir = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$scriptDir = Get-ScriptDirectory
+$projectsDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir '../..')).Path
 $projects = @(Get-ChildItem -Directory -LiteralPath $projectsDir | Where-Object {
         (Test-Path -LiteralPath (Join-Path $_.FullName '.git')) -and
         (Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') -PathType Leaf)
@@ -69,7 +78,7 @@ $projects | ForEach-Object -Parallel {
 
     $oldVer = (& vp -C $projDir pm pkg get engines.node 2>$null)
     if ($oldVer) {
-        $oldVer = $oldVer.Trim().Trim('"')
+        $oldVer = ([string]$oldVer).Trim().Trim('"')
     }
 
     if ($oldVer -ne $targetVer) {

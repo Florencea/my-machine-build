@@ -6,20 +6,6 @@
     Cross-platform system & workspace updater for macOS and Windows 11 (PowerShell 7).
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [switch]$SkipBrew,
-    [switch]$SkipWinget,
-    [switch]$SkipVite,
-    [switch]$SkipGit,
-
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -37,19 +23,42 @@ Options:
 "@
 }
 
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') { $Help = [switch]::new($true) }
-        elseif ($arg -match '^--?skip-?brew$') { $SkipBrew = [switch]::new($true) }
-        elseif ($arg -match '^--?skip-?winget$') { $SkipWinget = [switch]::new($true) }
-        elseif ($arg -match '^--?skip-?vite$') { $SkipVite = [switch]::new($true) }
-        elseif ($arg -match '^--?skip-?git$') { $SkipGit = [switch]::new($true) }
+$SkipBrew = $false
+$SkipWinget = $false
+$SkipVite = $false
+$SkipGit = $false
+
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        Show-Help
+        exit 0
     }
+    elseif ($arg -match '^--?skip-?brew$') { $SkipBrew = $true }
+    elseif ($arg -match '^--?skip-?winget$') { $SkipWinget = $true }
+    elseif ($arg -match '^--?skip-?vite$') { $SkipVite = $true }
+    elseif ($arg -match '^--?skip-?git$') { $SkipGit = $true }
 }
 
-if ($Help) {
-    Show-Help
-    exit 0
+function Get-ScriptDirectory {
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) {
+        $cmdArgs = [Environment]::GetCommandLineArgs()
+        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
+            $candidate = $cmdArgs[$i]
+            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                $scriptPath = $candidate
+                break
+            }
+        }
+    }
+    if (-not $scriptPath) {
+        throw 'Unable to determine script path.'
+    }
+    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
+    $targetInfo = $fileInfo.ResolveLinkTarget($true)
+    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
+    return (Split-Path -Parent $realPath)
 }
 
 if ($IsWindows) {
@@ -58,7 +67,8 @@ if ($IsWindows) {
     $env:PATH = "$userPath;$machinePath;$env:PATH"
 }
 
-$PROJECTS_DIR = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$scriptDir = Get-ScriptDirectory
+$PROJECTS_DIR = (Resolve-Path -LiteralPath (Join-Path $scriptDir '../..')).Path
 
 # 1. Upgrade OS Packages
 if ($IsMacOS -and (-not $SkipBrew)) {
@@ -92,14 +102,26 @@ if (-not $SkipVite) {
         exit 1
     }
 
-    & vp upgrade
+    $upgradeOut = @(& vp upgrade 2>&1)
+    foreach ($line in $upgradeOut) {
+        Write-Output $line
+    }
+
     $oldNode = (& vp node -v 2>$null)
-    $installOut = (& vp env install lts 2>&1)
+    if (-not $oldNode) {
+        $oldNode = (& node -v 2>$null)
+    }
+    $installOut = @(& vp env install lts 2>&1)
     $newNode = (& vp node -v 2>$null)
+    if (-not $newNode) {
+        $newNode = (& node -v 2>$null)
+    }
 
     if ($oldNode -and ($oldNode -ne $newNode)) {
-        Write-Output $installOut
-        & vp env clean 2>&1 | Out-Null
+        foreach ($line in $installOut) {
+            Write-Output $line
+        }
+        & vp env clean >$null 2>&1
     }
 
     $legacyNodeDir = Join-Path $HOME '.local/opt/node'

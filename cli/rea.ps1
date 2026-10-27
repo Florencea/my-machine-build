@@ -6,15 +6,6 @@
     Cross-platform MKV subtitle combiner for macOS and Windows 11 (PowerShell 7).
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -28,14 +19,15 @@ Usage: rea [input_dir]
 }
 
 $InputDir = ''
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
-        elseif (-not $InputDir) {
-            $InputDir = $arg
-        }
+$Help = $false
+
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        $Help = $true
+    }
+    elseif (-not $InputDir) {
+        $InputDir = $arg
     }
 }
 

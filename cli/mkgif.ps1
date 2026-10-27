@@ -6,34 +6,8 @@
     Cross-platform GIF maker for macOS and Windows 11 (PowerShell 7).
     - Generates high-quality animated GIFs from local videos or YouTube URLs
     - Uses yt-dlp --download-sections with browser cookies (default: chrome) and cookie-less fallback
-    - Uses gifski via yuv4mpegpipe when available, or FFmpeg 256-color diff palette + Bayer dithering fallback
+    - Uses gifski via PowerShell 7.4+ native byte-stream pipe (yuv4mpegpipe), or FFmpeg 256-color diff palette + Bayer dithering fallback
 #>
-
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('w')]
-    [int]$Width = 720,
-
-    [int]$Fps = 10,
-
-    [Alias('q')]
-    [int]$Quality = 70,
-
-    [Alias('l')]
-    [switch]$Lossy,
-
-    [Alias('b')]
-    [string]$Browser,
-
-    [Alias('o')]
-    [string]$Output,
-
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -57,55 +31,60 @@ Examples:
 "@
 }
 
+$Width = 720
+$Fps = 10
+$Quality = 70
+$Lossy = $false
+$Browser = ''
+$Output = ''
+$Help = $false
 $positionals = [System.Collections.Generic.List[string]]::new()
 
-if ($RemainingArgs) {
-    for ($i = 0; $i -lt $RemainingArgs.Count; $i++) {
-        $arg = $RemainingArgs[$i]
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
+for ($i = 0; $i -lt $args.Count; $i++) {
+    $arg = [string]$args[$i]
+    if ($arg -match '^--?h(elp)?$') {
+        $Help = $true
+    }
+    elseif ($arg -match '^--?fps$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --fps requires a value')
+            exit 1
         }
-        elseif ($arg -match '^--?fps$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --fps requires a value')
-                exit 1
-            }
-            $Fps = [int]$RemainingArgs[++$i]
+        $Fps = [int]$args[++$i]
+    }
+    elseif ($arg -match '^--?w(idth)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: -w/--width requires a value')
+            exit 1
         }
-        elseif ($arg -match '^--?w(idth)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: -w/--width requires a value')
-                exit 1
-            }
-            $Width = [int]$RemainingArgs[++$i]
+        $Width = [int]$args[++$i]
+    }
+    elseif ($arg -match '^--?q(uality)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: -q/--quality requires a value')
+            exit 1
         }
-        elseif ($arg -match '^--?q(uality)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: -q/--quality requires a value')
-                exit 1
-            }
-            $Quality = [int]$RemainingArgs[++$i]
+        $Quality = [int]$args[++$i]
+    }
+    elseif ($arg -match '^--?l(ossy)?$') {
+        $Lossy = $true
+    }
+    elseif ($arg -match '^--?b(rowser)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --browser requires a browser name')
+            exit 1
         }
-        elseif ($arg -match '^--?l(ossy)?$') {
-            $Lossy = [switch]::new($true)
+        $Browser = [string]$args[++$i]
+    }
+    elseif ($arg -match '^--?o(utput)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: -o/--output requires a file path')
+            exit 1
         }
-        elseif ($arg -match '^--?b(rowser)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --browser requires a browser name')
-                exit 1
-            }
-            $Browser = $RemainingArgs[++$i]
-        }
-        elseif ($arg -match '^--?o(utput)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: -o/--output requires a file path')
-                exit 1
-            }
-            $Output = $RemainingArgs[++$i]
-        }
-        else {
-            $positionals.Add($arg)
-        }
+        $Output = [string]$args[++$i]
+    }
+    else {
+        $positionals.Add($arg)
     }
 }
 
@@ -167,12 +146,12 @@ try {
         }
 
         $startSec = Convert-TimeToSeconds -TimeStr $Start
-        $durSec = [double]$Duration
+        $durSec = Convert-TimeToSeconds -TimeStr $Duration
         $endSec = $startSec + $durSec
         $ytHeight = ($Width -le 480) ? 480 : (($Width -le 720) ? 720 : (($Width -le 1280) ? 1080 : 2160))
         $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'chrome')
 
-        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("yt_gif_" + [System.Guid]::NewGuid().ToString('N'))
+        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ('yt_gif_' + [System.Guid]::NewGuid().ToString('N'))
         $ytFormat = "bestvideo[height<=$ytHeight]/best[height<=$ytHeight]/bestvideo/best"
 
         # Try with browser cookies first (default: chrome), then fallback without cookies
@@ -231,14 +210,20 @@ try {
     }
 
     if ($hasGifskiCli) {
-        $lossyArg = $Lossy ? '--lossy-quality 75' : ''
-        $cmdLine = "ffmpeg -y -hide_banner -loglevel error -ss $ffmpegStart -i `"$inputSource`" -t $Duration -vf `"fps=$Fps,scale=${Width}:-2:flags=lanczos,format=yuv420p`" -f yuv4mpegpipe - | gifski -q -Q $Quality -W $Width $lossyArg -o `"$outputFile`" -"
-        if ($IsWindows) {
-            & cmd.exe /c $cmdLine
+        $gifskiArgs = @('-q', '-Q', "$Quality", '-W', "$Width")
+        if ($Lossy) {
+            $gifskiArgs += @('--lossy-quality', '75')
         }
-        else {
-            & sh -c $cmdLine
-        }
+        $gifskiArgs += @('-o', $outputFile, '-')
+
+        # PowerShell 7.4+ preserves raw byte streams when piping between native commands
+        & ffmpeg -y -hide_banner `
+            -loglevel error `
+            -ss $ffmpegStart `
+            -i "$inputSource" `
+            -t $Duration `
+            -vf "fps=$Fps,scale=${Width}:-2:flags=lanczos,format=yuv420p" `
+            -f yuv4mpegpipe - | & gifski @gifskiArgs
     }
     else {
         & ffmpeg -y -hide_banner -loglevel error `

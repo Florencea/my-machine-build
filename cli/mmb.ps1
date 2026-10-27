@@ -6,15 +6,6 @@
     Cross-platform shortcut to open the build repository in Visual Studio Code.
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -26,17 +17,33 @@ Usage: mmb
 "@
 }
 
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        Show-Help
+        exit 0
     }
 }
 
-if ($Help) {
-    Show-Help
-    exit 0
+function Get-ScriptDirectory {
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) {
+        $cmdArgs = [Environment]::GetCommandLineArgs()
+        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
+            $candidate = $cmdArgs[$i]
+            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                $scriptPath = $candidate
+                break
+            }
+        }
+    }
+    if (-not $scriptPath) {
+        throw 'Unable to determine script path.'
+    }
+    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
+    $targetInfo = $fileInfo.ResolveLinkTarget($true)
+    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
+    return (Split-Path -Parent $realPath)
 }
 
 if (-not (Get-Command 'code' -ErrorAction SilentlyContinue)) {
@@ -44,5 +51,6 @@ if (-not (Get-Command 'code' -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$scriptDir = Get-ScriptDirectory
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptDir '..')).Path
 & code $repoRoot

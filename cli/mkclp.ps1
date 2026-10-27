@@ -4,32 +4,11 @@
     Fast video clip maker supporting local files and YouTube streaming.
 .DESCRIPTION
     Cross-platform video clip maker for macOS and Windows 11 (PowerShell 7).
-    - Zero-second lossless stream copying (-Copy or compatible local MP4)
+    - Zero-second lossless stream copying (-c/--copy or compatible local MP4)
     - Hardware-accelerated HEVC (hevc_videotoolbox -tag:v hvc1) on macOS (default Quality: 50)
     - Universal libx264 + AAC fallback on Windows/Linux (default Quality: 23)
     - Uses yt-dlp --download-sections with browser cookies (default: chrome) and automatic cookie-less fallback
 #>
-
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('q')]
-    [Nullable[int]]$Quality = $null,
-
-    [Alias('c')]
-    [switch]$Copy,
-
-    [Alias('b')]
-    [string]$Browser,
-
-    [Alias('o')]
-    [string]$Output,
-
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -52,43 +31,44 @@ Examples:
 "@
 }
 
+$Quality = $null
+$Copy = $false
+$Browser = ''
+$Output = ''
+$Help = $false
 $positionals = [System.Collections.Generic.List[string]]::new()
-$qualityExplicitlySet = ($null -ne $Quality)
 
-if ($RemainingArgs) {
-    for ($i = 0; $i -lt $RemainingArgs.Count; $i++) {
-        $arg = $RemainingArgs[$i]
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
+for ($i = 0; $i -lt $args.Count; $i++) {
+    $arg = [string]$args[$i]
+    if ($arg -match '^--?h(elp)?$') {
+        $Help = $true
+    }
+    elseif ($arg -match '^--?q(uality)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --quality requires a value')
+            exit 1
         }
-        elseif ($arg -match '^--?q(uality)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --quality requires a value')
-                exit 1
-            }
-            $Quality = [int]$RemainingArgs[++$i]
-            $qualityExplicitlySet = $true
+        $Quality = [int]$args[++$i]
+    }
+    elseif ($arg -match '^--?c(opy)?$') {
+        $Copy = $true
+    }
+    elseif ($arg -match '^--?b(rowser)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --browser requires a browser name')
+            exit 1
         }
-        elseif ($arg -match '^--?c(opy)?$') {
-            $Copy = [switch]::new($true)
+        $Browser = [string]$args[++$i]
+    }
+    elseif ($arg -match '^--?o(utput)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --output requires a file path')
+            exit 1
         }
-        elseif ($arg -match '^--?b(rowser)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --browser requires a browser name')
-                exit 1
-            }
-            $Browser = $RemainingArgs[++$i]
-        }
-        elseif ($arg -match '^--?o(utput)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --output requires a file path')
-                exit 1
-            }
-            $Output = $RemainingArgs[++$i]
-        }
-        else {
-            $positionals.Add($arg)
-        }
+        $Output = [string]$args[++$i]
+    }
+    else {
+        $positionals.Add($arg)
     }
 }
 
@@ -109,7 +89,8 @@ if ($positionals.Count -lt 3) {
 $InputFile = $positionals[0]
 $Start = $positionals[1]
 $Duration = $positionals[2]
-$effectiveQuality = ($null -ne $Quality) ? [int]$Quality : ($IsMacOS ? 50 : 23)
+$qualityExplicitlySet = ($null -ne $Quality)
+$effectiveQuality = $qualityExplicitlySet ? [int]$Quality : ($IsMacOS ? 50 : 23)
 
 if ($IsWindows -and (-not (Get-Command 'ffmpeg' -ErrorAction SilentlyContinue) -or -not (Get-Command 'yt-dlp' -ErrorAction SilentlyContinue))) {
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -153,11 +134,11 @@ try {
         }
 
         $startSec = Convert-TimeToSeconds -TimeStr $Start
-        $durSec = [double]$Duration
+        $durSec = Convert-TimeToSeconds -TimeStr $Duration
         $endSec = $startSec + $durSec
         $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'chrome')
 
-        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("yt_clip_" + [System.Guid]::NewGuid().ToString('N'))
+        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ('yt_clip_' + [System.Guid]::NewGuid().ToString('N'))
         $ytFormat = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'
 
         # Try with browser cookies first (default: chrome), then fallback without cookies
@@ -198,10 +179,10 @@ try {
     $mapArgs = @('-map', '0:v:0', '-map', '0:a?')
     $vcArgs = @()
 
-    $format = (& ffprobe -v error -show_entries format=format_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
-    $codec = (& ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
+    $format = [string](& ffprobe -v error -show_entries format=format_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
+    $codec = [string](& ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
 
-    if ($Copy -or ($isLocal -and ($format -match 'mp4') -and ($codec -in @('h264', 'hevc')) -and (-not $qualityExplicitlySet))) {
+    if ($Copy -or ($isLocal -and ($format -match 'mp4') -and ($codec.Trim() -in @('h264', 'hevc')) -and (-not $qualityExplicitlySet))) {
         $vcArgs = @('-c:v', 'copy', '-c:a', 'copy')
     }
     elseif ($IsMacOS) {

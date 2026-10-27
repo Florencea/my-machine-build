@@ -119,8 +119,8 @@ To maximize agent precision and eliminate context bloat, execute tasks along fiv
    - High-I/O workspaces (`E:\_Workspace`) and toolchains (`VP_HOME = E:\vite-plus`) reside on the ReFS Dev Drive (`E:`) with Microsoft Defender asynchronous Performance Mode enabled.
 5. **Array Unrolling & String Indexing Pitfall**:
    - In PowerShell, pipeline filters (e.g. `Where-Object`) unroll single-element results into a scalar `System.String`. Indexing a scalar string with `[0]` extracts the first character (`[char]'h'`) instead of the line. ALWAYS wrap pipeline outputs with `@(...)` before accessing `[0]`.
-6. **Dual-Style CLI Flag Binding (PowerShell `-Param` & POSIX `--param`)**:
-   - Always include `[Parameter(ValueFromRemainingArguments = $true)] [string[]]$RemainingArgs` and parse GNU-style `--flag` options into parameter variables.
+6. **Dual-Style CLI Flag Binding & Symlink-Safe Path Resolution**:
+   - Parse `$args` directly (avoiding `[CmdletBinding()]` CommonParameters collisions) to support both GNU-style `--flag` and PowerShell `-Flag` options, and resolve extensionless symlink paths via `[Environment]::GetCommandLineArgs()` + `ResolveLinkTarget($true)` when `$PSScriptRoot` is empty.
 7. **YouTube Protected Streaming & Section Downloads**:
    - Modern YouTube stream URLs (`googlevideo.com`) use Sabr/TVHTML5 token binding. Attempting direct playback via `ffmpeg -i <url>` results in `403 Forbidden`. Always use `yt-dlp --download-sections "*<START>-<END>"` (with browser cookie support `--cookies-from-browser chrome` and cookie-less fallback) to fetch snippet media directly to disk before processing with `ffmpeg` or `gifski`.
 

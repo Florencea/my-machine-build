@@ -6,15 +6,6 @@
     Cross-platform Node.js dependency updater for macOS and Windows 11 (PowerShell 7).
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -26,17 +17,12 @@ Usage: up
 "@
 }
 
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        Show-Help
+        exit 0
     }
-}
-
-if ($Help) {
-    Show-Help
-    exit 0
 }
 
 foreach ($cmd in @('git', 'jq', 'vp', 'vpr', 'vpx', 'yq')) {
@@ -51,7 +37,7 @@ if (-not (Test-Path -LiteralPath 'package.json' -PathType Leaf)) {
     exit 1
 }
 
-$currentBranch = (& git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+$currentBranch = ([string](& git rev-parse --abbrev-ref HEAD 2>$null)).Trim()
 if ($currentBranch -ne 'main') {
     [Console]::Error.WriteLine("Error: Current branch is not 'main' ($currentBranch)")
     exit 1
@@ -121,7 +107,7 @@ if ($isVitePlus) {
 
     $localVpVer = $deps['vite-plus'] ?? $devDeps['vite-plus'] ?? ''
     if ($localVpVer -eq 'catalog:' -and (Test-Path -LiteralPath 'pnpm-workspace.yaml' -PathType Leaf)) {
-        $localVpVer = (& yq '.catalog.vite-plus // .catalogs.default.vite-plus // ""' pnpm-workspace.yaml 2>$null).Trim()
+        $localVpVer = ([string](& yq '.catalog.vite-plus // .catalogs.default.vite-plus // ""' pnpm-workspace.yaml 2>$null)).Trim()
     }
 
     if ($globalVpVer -and $localVpVer -and ($localVpVer -ne $globalVpVer)) {

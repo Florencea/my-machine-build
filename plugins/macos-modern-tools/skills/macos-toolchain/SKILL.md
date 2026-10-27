@@ -112,8 +112,11 @@ Before executing unfamiliar commands or authoring configs, query these verified 
   set -euo pipefail
   ```
 - **Zsh 1-Based Indexing & Modifiers**: Zsh arrays start at 1 (`$array[1]`). Use native modifiers: `${file:A}` (abs), `${file:h}` (dir), `${file:t}` (name), `${file:r:t}` (basename).
-- **PowerShell 7 CLI Header**:
+- **PowerShell 7 CLI Header & Standards**:
   ```powershell
   #!/usr/bin/env -S pwsh -NoLogo -NoProfile
   ```
   - Always set `Set-StrictMode -Version Latest`, `$ErrorActionPreference = 'Stop'`, and `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)`.
+  - Parse `$args` directly (avoiding `[CmdletBinding()]` CommonParameters collisions) to support both POSIX (`--flag`, `-h`) and PowerShell (`-Flag`, `-Help`) options.
+  - Because `pwsh` executes extensionless symlinks (`~/.local/bin/<cmd>`) as anonymous `ScriptBlock`s with `$PSScriptRoot` and `$PSCommandPath` empty, resolve physical script paths via `[Environment]::GetCommandLineArgs()` and `[System.IO.FileInfo]::new(...).ResolveLinkTarget($true)`.
+  - Leverage PowerShell 7.4+ native byte-stream piping (`& ffmpeg ... | & gifski ...`) and `yt-dlp --download-sections` (with `--cookies-from-browser chrome` and cookie-less fallback) to avoid YouTube `403 Forbidden` stream errors.

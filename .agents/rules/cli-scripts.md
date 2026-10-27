@@ -23,11 +23,18 @@ description: Rules for managing, authoring, and verifying cross-platform PowerSh
 
 ---
 
-## 2. Mandatory `--help` & `-h` Support & Dual-Style Parameter Binding
+## 2. Direct `$args` Parsing & Symlink-Safe Path Resolution
 
-- All CLI scripts under `cli/<command>.ps1` MUST implement `[CmdletBinding(PositionalBinding = $false)]` and `[Parameter(ValueFromRemainingArguments = $true)] [string[]]$RemainingArgs`.
-- Support both PowerShell style (`-Llms`, `-Quality`, `-Help`) and POSIX/GNU style (`--llms`, `--quality`, `-h`, `--help`) flags.
-- Do NOT mark positional parameters with `Mandatory = $true` inside `param(...)`, as doing so causes PowerShell to interactively prompt for missing arguments before `--help` can be evaluated. Instead, evaluate `-h` / `--help` first and exit with code 0 (`exit 0`).
+- **Direct `$args` Parsing (No `[CmdletBinding()] param(...)`)**:
+  - Parse CLI arguments directly from `$args` (`for ($i = 0; $i -lt $args.Count; $i++) { $arg = [string]$args[$i] ... }`) rather than `[CmdletBinding()] param(...)`.
+  - Avoiding `[CmdletBinding()]` prevents PowerShell's `ParameterBinder` and CommonParameters (`-WarningAction`, `-OutVariable`, `-Verbose`, `-Debug`) from colliding with short POSIX flags (`-w`, `-o`, `-v`, `-d`).
+  - Support both POSIX/GNU style (`--llms`, `--quality`, `-w`, `-h`, `--help`) and PowerShell style (`-Llms`, `-Quality`, `-Width`, `-Help`) via case-insensitive regex matching (`-match`).
+- **Extensionless Shebang & Symlink Path Resolution (`Get-ScriptDirectory`)**:
+  - When `pwsh` executes an extensionless file via shebang on macOS/Linux (e.g., `~/.local/bin/ua`), PowerShell's engine runs it as an anonymous `ScriptBlock` and leaves `$PSScriptRoot` and `$PSCommandPath` empty (`""`).
+  - Furthermore, `~/.local/bin/<cmd>` is a symlink whose parent directory is `~/.local/bin`, not `cli/`.
+  - Any script that resolves paths relative to the repository MUST resolve the physical target path via `$PSCommandPath` with `[Environment]::GetCommandLineArgs()` fallback and `[System.IO.FileInfo]::new(...).ResolveLinkTarget($true)`.
+- **PowerShell 7.4+ Native Byte-Stream Piping**:
+  - Pipe binary streams directly between external native commands (`& ffmpeg ... | & gifski ...`) relying on PowerShell 7.4+ default `PSNativeCommandPreserveBytePipe` rather than `sh -c` or `cmd.exe /c` string interpolation.
 
 ---
 

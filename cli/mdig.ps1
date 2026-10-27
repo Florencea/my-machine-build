@@ -7,15 +7,6 @@
     Uses 'dig' when available (macOS / BIND tools), or Windows built-in 'Resolve-DnsName' cmdlet.
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -29,14 +20,15 @@ Usage: mdig [domain]
 }
 
 $Domain = ''
-if ($RemainingArgs) {
-    foreach ($arg in $RemainingArgs) {
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
-        elseif (-not $Domain) {
-            $Domain = $arg
-        }
+$Help = $false
+
+foreach ($rawArg in $args) {
+    $arg = [string]$rawArg
+    if ($arg -match '^--?h(elp)?$') {
+        $Help = $true
+    }
+    elseif (-not $Domain) {
+        $Domain = $arg
     }
 }
 
@@ -68,103 +60,87 @@ $dnsServers = @(
     [PSCustomObject]@{ Index = 4; Name = 'System'; IPv4 = ''; IPv6 = '' }
 )
 
-$results = @($dnsServers | ForEach-Object -Parallel {
-        $srv = $_
+$queries = [System.Collections.Generic.List[object]]::new()
+foreach ($srv in $dnsServers) {
+    $queries.Add([PSCustomObject]@{ Index = $srv.Index; Name = $srv.Name; RecordType = 'A'; ServerIp = $srv.IPv4 })
+    $queries.Add([PSCustomObject]@{ Index = $srv.Index; Name = $srv.Name; RecordType = 'AAAA'; ServerIp = $srv.IPv6 })
+}
+
+$rawResults = @($queries | ForEach-Object -Parallel {
+        $q = $_
         $targetDomain = $using:Domain
         $useDig = $using:hasDig
+        $recType = $q.RecordType
+        $srvIp = $q.ServerIp
 
-        function Invoke-SingleDnsQuery {
-            param([string]$DomainName, [string]$RecordType, [string]$ServerIp, [bool]$UseDigTool)
-
-            if ($UseDigTool) {
-                $digArgs = @()
-                if ($ServerIp) {
-                    $digArgs += "@$ServerIp"
-                }
-                $digArgs += @($DomainName, $RecordType, '+noclass', '+nottl', '+noall', '+answer', '+stats', '+time=2', '+tries=1')
-                $out = @(& dig @digArgs 2>$null)
-                if ($LASTEXITCODE -ne 0 -or $out.Count -eq 0) {
-                    return [PSCustomObject]@{ Key = "[$RecordType timeout]"; Time = '' }
-                }
-
-                $records = [System.Collections.Generic.List[string]]::new()
-                $queryTime = ''
-                foreach ($line in $out) {
-                    $parts = @($line -split '\s+' | Where-Object { $_ -ne '' })
-                    if ($parts.Count -ge 3 -and $parts[1] -eq $RecordType) {
-                        $records.Add($parts[2])
-                    }
-                    elseif ($parts.Count -ge 4 -and $parts[0] -eq ';;' -and $parts[1] -eq 'Query' -and $parts[2] -eq 'time:') {
-                        $queryTime = $parts[3]
-                    }
-                }
-
-                if ($records.Count -eq 0) {
-                    return [PSCustomObject]@{ Key = "[no $RecordType record]"; Time = $queryTime }
-                }
-                $sortedIps = ($records | Sort-Object) -join ','
-                return [PSCustomObject]@{ Key = $sortedIps; Time = $queryTime }
+        if ($useDig) {
+            $digArgs = @()
+            if ($srvIp) {
+                $digArgs += "@$srvIp"
             }
-            else {
-                $sw = [System.Diagnostics.Stopwatch]::StartNew()
-                try {
-                    $params = @{
-                        Name         = $DomainName
-                        Type         = $RecordType
-                        DnsOnly      = $true
-                        QuickTimeout = $true
-                        NoHostsFile  = $true
-                        ErrorAction  = 'Stop'
-                    }
-                    if ($ServerIp) {
-                        $params['Server'] = $ServerIp
-                    }
-                    $dnsOut = @(Resolve-DnsName @params)
-                    $sw.Stop()
-                    $queryTime = [string][Math]::Round($sw.Elapsed.TotalMilliseconds)
+            $digArgs += @($targetDomain, $recType, '+noclass', '+nottl', '+noall', '+answer', '+stats', '+time=2', '+tries=1')
+            $out = @(& dig @digArgs 2>$null)
+            if ($LASTEXITCODE -ne 0 -or $out.Count -eq 0) {
+                return [PSCustomObject]@{ Index = $q.Index; Name = $q.Name; RecordType = $recType; ServerIp = $srvIp; Key = "[$recType timeout]"; Time = '' }
+            }
 
-                    $ips = @($dnsOut | Where-Object { $_.Type -eq $RecordType } | ForEach-Object { $_.IPAddress } | Where-Object { $_ })
-                    if ($ips.Count -eq 0) {
-                        return [PSCustomObject]@{ Key = "[no $RecordType record]"; Time = $queryTime }
-                    }
-                    $sortedIps = ($ips | Sort-Object) -join ','
-                    return [PSCustomObject]@{ Key = $sortedIps; Time = $queryTime }
+            $records = [System.Collections.Generic.List[string]]::new()
+            $queryTime = ''
+            foreach ($line in $out) {
+                $parts = @($line -split '\s+' | Where-Object { $_ -ne '' })
+                if ($parts.Count -ge 3 -and $parts[1] -eq $recType) {
+                    $records.Add($parts[2])
                 }
-                catch {
-                    $sw.Stop()
-                    $msg = $_.Exception.Message
-                    if ($msg -match 'timeout|timed out|1460') {
-                        return [PSCustomObject]@{ Key = "[$RecordType timeout]"; Time = '' }
-                    }
-                    return [PSCustomObject]@{ Key = "[no $RecordType record]"; Time = [string][Math]::Round($sw.Elapsed.TotalMilliseconds) }
+                elseif ($parts.Count -ge 4 -and $parts[0] -eq ';;' -and $parts[1] -eq 'Query' -and $parts[2] -eq 'time:') {
+                    $queryTime = $parts[3]
                 }
             }
-        }
 
-        $resA = Invoke-SingleDnsQuery -DomainName $targetDomain -RecordType 'A' -ServerIp $srv.IPv4 -UseDigTool $useDig
-        $resAAAA = Invoke-SingleDnsQuery -DomainName $targetDomain -RecordType 'AAAA' -ServerIp $srv.IPv6 -UseDigTool $useDig
-
-        [PSCustomObject]@{
-            Index    = $srv.Index
-            Name     = $srv.Name
-            IPv4     = $srv.IPv4
-            IPv6     = $srv.IPv6
-            AKey     = $resA.Key
-            ATime    = $resA.Time
-            AAAAKey  = $resAAAA.Key
-            AAAATime = $resAAAA.Time
+            $key = ($records.Count -eq 0) ? "[no $recType record]" : (($records | Sort-Object) -join ',')
+            return [PSCustomObject]@{ Index = $q.Index; Name = $q.Name; RecordType = $recType; ServerIp = $srvIp; Key = $key; Time = $queryTime }
         }
-    } -ThrottleLimit 5 | Sort-Object Index)
+        else {
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+                $params = @{
+                    Name         = $targetDomain
+                    Type         = $recType
+                    DnsOnly      = $true
+                    QuickTimeout = $true
+                    NoHostsFile  = $true
+                    ErrorAction  = 'Stop'
+                }
+                if ($srvIp) {
+                    $params['Server'] = $srvIp
+                }
+                $dnsOut = @(Resolve-DnsName @params)
+                $sw.Stop()
+                $queryTime = [string][Math]::Round($sw.Elapsed.TotalMilliseconds)
+
+                $ips = @($dnsOut | Where-Object { $_.Type -eq $recType } | ForEach-Object { $_.IPAddress } | Where-Object { $_ })
+                $key = ($ips.Count -eq 0) ? "[no $recType record]" : (($ips | Sort-Object) -join ',')
+                return [PSCustomObject]@{ Index = $q.Index; Name = $q.Name; RecordType = $recType; ServerIp = $srvIp; Key = $key; Time = $queryTime }
+            }
+            catch {
+                $sw.Stop()
+                $msg = $_.Exception.Message
+                if ($msg -match 'timeout|timed out|1460') {
+                    return [PSCustomObject]@{ Index = $q.Index; Name = $q.Name; RecordType = $recType; ServerIp = $srvIp; Key = "[$recType timeout]"; Time = '' }
+                }
+                return [PSCustomObject]@{ Index = $q.Index; Name = $q.Name; RecordType = $recType; ServerIp = $srvIp; Key = "[no $recType record]"; Time = [string][Math]::Round($sw.Elapsed.TotalMilliseconds) }
+            }
+        }
+    } -ThrottleLimit 10)
 
 function Write-DnsSection {
-    param([string]$Title, [object[]]$Items, [string]$KeyProp, [string]$IpProp, [string]$TimeProp)
+    param([string]$Title, [object[]]$Items)
 
     Write-Output "── $Title ──"
     $order = [System.Collections.Generic.List[string]]::new()
     $groups = @{}
 
-    foreach ($item in $Items) {
-        $k = $item.$KeyProp
+    foreach ($item in ($Items | Sort-Object Index)) {
+        $k = $item.Key
         if (-not $groups.ContainsKey($k)) {
             $order.Add($k)
             $groups[$k] = [System.Collections.Generic.List[object]]::new()
@@ -183,8 +159,8 @@ function Write-DnsSection {
         }
 
         foreach ($entry in $groups[$k]) {
-            $ipVal = $entry.$IpProp
-            $timeVal = $entry.$TimeProp
+            $ipVal = $entry.ServerIp
+            $timeVal = $entry.Time
             $desc = $ipVal ? "$($entry.Name) ($ipVal)" : $entry.Name
             if ($timeVal) {
                 Write-Output "  - $desc [$timeVal ms]"
@@ -197,5 +173,5 @@ function Write-DnsSection {
     }
 }
 
-Write-DnsSection -Title 'A Records' -Items $results -KeyProp 'AKey' -IpProp 'IPv4' -TimeProp 'ATime'
-Write-DnsSection -Title 'AAAA Records' -Items $results -KeyProp 'AAAAKey' -IpProp 'IPv6' -TimeProp 'AAAATime'
+Write-DnsSection -Title 'A Records' -Items @($rawResults | Where-Object { $_.RecordType -eq 'A' })
+Write-DnsSection -Title 'AAAA Records' -Items @($rawResults | Where-Object { $_.RecordType -eq 'AAAA' })

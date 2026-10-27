@@ -8,27 +8,6 @@
     supports automatic probing of /llms-full.txt and /llms.txt, and CSS selectors via htmlq.
 #>
 
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [Alias('s')]
-    [string]$Selector,
-
-    [Alias('l')]
-    [switch]$Llms,
-
-    [Alias('r')]
-    [switch]$Raw,
-
-    [Alias('o')]
-    [string]$Output,
-
-    [Alias('h')]
-    [switch]$Help,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$RemainingArgs
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -55,46 +34,50 @@ Examples:
 "@
 }
 
+$Selector = ''
+$Llms = $false
+$Raw = $false
+$Output = ''
+$Help = $false
 $targetUrl = ''
-if ($RemainingArgs) {
-    for ($i = 0; $i -lt $RemainingArgs.Count; $i++) {
-        $arg = $RemainingArgs[$i]
-        if ($arg -match '^--?h(elp)?$') {
-            $Help = [switch]::new($true)
-        }
-        elseif ($arg -match '^--?l(lms)?$') {
-            $Llms = [switch]::new($true)
-        }
-        elseif ($arg -match '^--?r(aw)?$') {
-            $Raw = [switch]::new($true)
-        }
-        elseif ($arg -match '^--?s(elector)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --selector requires a CSS selector argument')
-                exit 1
-            }
-            $Selector = $RemainingArgs[++$i]
-        }
-        elseif ($arg -match '^--?o(utput)?$') {
-            if ($i + 1 -ge $RemainingArgs.Count) {
-                [Console]::Error.WriteLine('Error: --output requires a file path argument')
-                exit 1
-            }
-            $Output = $RemainingArgs[++$i]
-        }
-        elseif ($arg.StartsWith('-')) {
-            [Console]::Error.WriteLine("Error: Unknown option $arg")
-            Show-Help
+
+for ($i = 0; $i -lt $args.Count; $i++) {
+    $arg = [string]$args[$i]
+    if ($arg -match '^--?h(elp)?$') {
+        $Help = $true
+    }
+    elseif ($arg -match '^--?l(lms)?$') {
+        $Llms = $true
+    }
+    elseif ($arg -match '^--?r(aw)?$') {
+        $Raw = $true
+    }
+    elseif ($arg -match '^--?s(elector)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --selector requires a CSS selector argument')
             exit 1
         }
-        elseif (-not $targetUrl) {
-            $targetUrl = $arg
-        }
-        else {
-            [Console]::Error.WriteLine("Error: Unexpected argument $arg")
-            Show-Help
+        $Selector = [string]$args[++$i]
+    }
+    elseif ($arg -match '^--?o(utput)?$') {
+        if ($i + 1 -ge $args.Count) {
+            [Console]::Error.WriteLine('Error: --output requires a file path argument')
             exit 1
         }
+        $Output = [string]$args[++$i]
+    }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
+    }
+    elseif (-not $targetUrl) {
+        $targetUrl = $arg
+    }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
     }
 }
 
@@ -160,8 +143,7 @@ function Get-WebreadContent {
     }
 
     if ($Selector) {
-        $rawHtml = & $curlCmd -sL -A $userAgent "$UrlToFetch"
-        return ($rawHtml | & htmlq $Selector)
+        return (& $curlCmd -sL -A $userAgent "$UrlToFetch" | & htmlq $Selector)
     }
 
     if ($CurrentMode -eq 'raw') {
@@ -177,7 +159,7 @@ function Get-WebreadContent {
 
     [Console]::Error.WriteLine('Notice: Jina Reader unavailable, falling back to direct fetch...')
     if (Get-Command 'htmlq' -ErrorAction SilentlyContinue) {
-        return ((& $curlCmd -sL -A $userAgent "$UrlToFetch") | & htmlq 'body')
+        return (& $curlCmd -sL -A $userAgent "$UrlToFetch" | & htmlq 'body')
     }
     return (& $curlCmd -sL -A $userAgent "$UrlToFetch")
 }
