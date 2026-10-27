@@ -97,6 +97,10 @@ if ($Help) {
     exit 0
 }
 
+if ($positionals.Count -ge 4 -and $positionals[0] -match '^mkclp(\.ps1)?$') {
+    $positionals.RemoveAt(0)
+}
+
 if ($positionals.Count -lt 3) {
     Show-Help | ForEach-Object { [Console]::Error.WriteLine($_) }
     exit 1
@@ -128,7 +132,12 @@ function Convert-TimeToSeconds {
     elseif ($TimeStr -match '^(\d+):(\d{2}(?:\.\d+)?)$') {
         return [double]$Matches[1] * 60 + [double]$Matches[2]
     }
-    return [double]$TimeStr
+    $parsed = 0.0
+    if ([double]::TryParse($TimeStr, [ref]$parsed)) {
+        return $parsed
+    }
+    [Console]::Error.WriteLine("Error: Invalid time value '$TimeStr' (expected HH:MM:SS, MM:SS, or seconds).")
+    exit 1
 }
 
 $isLocal = Test-Path -LiteralPath $InputFile -PathType Leaf
