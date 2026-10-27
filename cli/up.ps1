@@ -62,14 +62,54 @@ function Invoke-Step {
     param(
         [string]$Message,
         [string]$Exe,
-        [string[]]$Arguments
+        [string[]]$Arguments = @()
     )
-    Write-Host -NoNewline "`r  ⠋ $Message..."
+    $Arguments = $Arguments ?? @()
+    $frames = @('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏')
+    $frameIdx = 0
+
     $prevLog = $env:VP_LOG
     $env:VP_LOG = 'error'
+
+    $job = Start-ThreadJob -ScriptBlock {
+        param($cmdExe, [string[]]$cmdArgs)
+        try {
+            $output = @(& $cmdExe @cmdArgs 2>&1)
+            [PSCustomObject]@{
+                Output   = $output
+                ExitCode = ($LASTEXITCODE ?? 0)
+            }
+        }
+        catch {
+            [PSCustomObject]@{
+                Output   = @($_.ToString())
+                ExitCode = 1
+            }
+        }
+    } -ArgumentList @($Exe, $Arguments)
+
     try {
-        $output = @(& $Exe @Arguments 2>&1)
-        $code = $LASTEXITCODE
+        Write-Host -NoNewline "`e[?25l`r  $($frames[$frameIdx]) $Message..."
+        $frameIdx = ($frameIdx + 1) % $frames.Count
+
+        while (-not $job.Finished.WaitOne(80)) {
+            Write-Host -NoNewline "`r  $($frames[$frameIdx]) $Message..."
+            $frameIdx = ($frameIdx + 1) % $frames.Count
+        }
+
+        $res = Receive-Job -Job $job
+        $resObj = ($res -is [array]) ? $res[-1] : $res
+        $output = @()
+        $code = 0
+        if ($null -ne $resObj) {
+            $output = $resObj.Output ?? @()
+            $code = [int]($resObj.ExitCode ?? 0)
+        }
+        else {
+            $code = 1
+            $output = @("Step '$Message' terminated unexpectedly.")
+        }
+
         Write-Host -NoNewline "`r`e[K"
         if ($code -ne 0) {
             foreach ($line in $output) {
@@ -79,6 +119,13 @@ function Invoke-Step {
         }
     }
     finally {
+        Write-Host -NoNewline "`e[?25h"
+        if ($null -ne $job) {
+            if ($job.JobStateInfo.State -eq [System.Management.Automation.JobState]::Running) {
+                Stop-Job -Job $job -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
         $env:VP_LOG = $prevLog
     }
 }
