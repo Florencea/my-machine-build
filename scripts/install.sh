@@ -157,7 +157,7 @@ fetch_file() {
     fi
   else
     local encoded_path="${rel_path// /%20}"
-    curl -fsSL "https://raw.githubusercontent.com/Florencea/my-macos-build/main/$encoded_path" -o "$dest_path"
+    curl -fsSL "https://raw.githubusercontent.com/Florencea/my-machine-build/main/$encoded_path" -o "$dest_path"
   fi
 }
 
@@ -240,8 +240,8 @@ rmdir "$HOME/.gemini/config/skills" 2>/dev/null || true
 CLI_DIR=""
 if [[ -n "${REPO_DIR:-}" && -d "$REPO_DIR/cli" ]]; then
   CLI_DIR="$REPO_DIR/cli"
-elif [[ -d "$HOME/Developer/my-macos-build/cli" ]]; then
-  CLI_DIR="$HOME/Developer/my-macos-build/cli"
+elif [[ -d "$HOME/Developer/my-machine-build/cli" ]]; then
+  CLI_DIR="$HOME/Developer/my-machine-build/cli"
 fi
 
 if [[ -n "$CLI_DIR" ]]; then

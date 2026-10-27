@@ -1,7 +1,7 @@
 #!/usr/bin/env -S pwsh -NoLogo -NoProfile
 <#
 .SYNOPSIS
-    Open current build workspace in Visual Studio Code (My Machine Build / My macOS Build).
+    Open current build workspace in Visual Studio Code (My Machine Build).
 .DESCRIPTION
     Cross-platform shortcut to open the build repository in Visual Studio Code.
 #>
