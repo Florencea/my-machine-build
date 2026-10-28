@@ -150,6 +150,83 @@ Agents MUST actively inspect official documentation or run `<tool> --help` befor
 
 ### 3.6 Web Stack, Language Toolchains & Runtimes
 
+### 3.1 Multimedia Processing (CRITICAL: Never Guess Filtergraphs or Stream Flags)
+- **`yt-dlp`**:
+  - Official Reference: `webread https://github.com/yt-dlp/yt-dlp#usage-and-options`
+  - CLI Help: `yt-dlp --help`
+  - *Mandate*: Always run `yt-dlp --help` to confirm options like `--download-sections "*<START>-<END>"`, `--cookies-from-browser <browser>`, and `-f <format>`. Never guess extractor arguments.
+- **`ffmpeg` & `ffprobe`**:
+  - Official Documentation: `webread https://ffmpeg.org/ffmpeg.html` (and `webread https://ffmpeg.org/ffprobe.html`)
+  - Official Wiki & Guides: `https://trac.ffmpeg.org/wiki`
+  - CLI Help: `ffmpeg -h full` / `ffmpeg -h filter=<name>` / `ffprobe -h`
+  - *Mandate*: Video filters (`-vf`), audio maps (`-map`), pixel formats (`-pix_fmt`), and codec options vary drastically across versions. Verify the exact syntax via `ffmpeg -h` or official docs before running complex encoding pipelines.
+- **`gifski`**:
+  - Official Reference: `webread https://github.com/ImageOptim/gifski`
+  - CLI Help: `gifski --help`
+
+### 3.2 Data Analytics, SQL & Persistence
+- **`duckdb`**:
+  - LLM Full Reference: `webread --llms https://duckdb.org` (or `https://duckdb.org/docs/`)
+  - CLI Help: `duckdb --help`
+- **`sqlite3`**:
+  - Official CLI Reference: `https://www.sqlite.org/cli.html`
+  - CLI Help: `sqlite3 --help`
+- **`xsv`**:
+  - Official Manual: `https://github.com/BurntSushi/xsv`
+  - CLI Help: `xsv --help`
+
+### 3.3 Code Intelligence, Structural Search & Preview
+- **`ast-grep` (`sg`)**:
+  - LLM Full Reference: `webread --llms https://ast-grep.github.io`
+  - CLI Help: `sg --help`
+- **`ripgrep` (`rg`)**:
+  - User Guide: `webread https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md`
+  - CLI Help: `rg --help`
+- **`fd`**:
+  - Official README: `webread https://github.com/sharkdp/fd`
+  - CLI Help: `fd --help`
+- **`bat`**:
+  - Official README: `webread https://github.com/sharkdp/bat`
+  - CLI Help: `bat --help`
+- **`tokei`**:
+  - Official README: `webread https://github.com/XAMPPRocky/tokei`
+  - CLI Help: `tokei --help`
+
+### 3.4 Text Replacement, Data Formatting & Documents
+- **`sd`**:
+  - Official README: `webread https://github.com/chmln/sd`
+  - CLI Help: `sd --help`
+- **`jq`**:
+  - Official Manual: `webread https://jqlang.github.io/jq/manual/`
+  - CLI Help: `jq --help`
+- **`yq`**:
+  - Official Docs: `webread https://mikefarah.gitbook.io/yq/`
+  - CLI Help: `yq --help`
+- **`shfmt`**:
+  - Official README: `webread https://github.com/mvdan/sh`
+  - CLI Help: `shfmt --help`
+- **`pdftotext` (Poppler)**:
+  - Official Manpage: `webread https://linux.die.net/man/1/pdftotext`
+  - CLI Help: `pdftotext -h`
+
+### 3.5 Networking, Benchmarking, Security & CI
+- **`xh`**:
+  - Official Manual: `webread https://github.com/ducaale/xh`
+  - CLI Help: `xh --help`
+- **`hyperfine`**:
+  - Official README: `webread https://github.com/sharkdp/hyperfine`
+  - CLI Help: `hyperfine --help`
+- **`actionlint`**:
+  - Official Usage: `webread https://github.com/rhysd/actionlint/blob/main/docs/usage.md`
+  - CLI Help: `actionlint -help`
+- **`1Password CLI` (`op`)**:
+  - Developer Reference: `https://developer.1password.com/docs/cli/reference/`
+  - CLI Help: `op --help`
+- **`dust`**:
+  - Official README: `webread https://github.com/bootandy/dust`
+  - CLI Help: `dust --help`
+
+### 3.6 Web Stack, Language Toolchains & Runtimes
 - **Vite+ Toolchain (`vp`, `vpx`, `vpr`)**:
   - LLM Full Reference: `webread --llms https://viteplus.dev` (or `https://viteplus.dev/llms-full.txt`)
   - CLI Help: `vp help` / `vp --help`
@@ -168,6 +245,10 @@ Agents MUST actively inspect official documentation or run `<tool> --help` befor
 
 ### 3.7 Custom Local CLI Helpers (`~/.local/bin` on PATH)
 
+- ALWAYS treat as black boxes and run `<command> --help` before execution:
+  - `webread --help`, `clall --help`, `ebk --help`, `mdig --help`, `mkclp --help`, `mkgif --help`, `mmb --help`, `rea --help`, `ua --help`, `unodev --help`, `up --help`.
+
+### 3.7 Custom Local CLI Helpers (`~/.local/bin` on PATH)
 - ALWAYS treat as black boxes and run `<command> --help` before execution:
   - `webread --help`, `clall --help`, `ebk --help`, `mdig --help`, `mkclp --help`, `mkgif --help`, `mmb --help`, `rea --help`, `ua --help`, `unodev --help`, `up --help`.
 
