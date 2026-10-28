@@ -1,7 +1,6 @@
 {
   "version": "2026.1026.1812",
   "rulesets": [
-    "+jpn-1",
     "+adguard-mobile",
     "+block-lan",
     "+adguard-spyware-url",
@@ -13,26 +12,55 @@
     "+annoyances-others",
     "+annoyances-notifications",
     "+ublock-experimental",
-    "+ubol-tests"
+    "+ubol-tests",
+    "+jpn-1"
   ],
   "filteringModes": {
     "none": [],
     "basic": [],
     "optimal": [],
-    "complete": ["all-urls"]
+    "complete": [
+      "all-urls"
+    ]
   },
   "customFilters": [
-    ["books.com.tw", ["#app_banner", ".ad_pop", ".header_pop"]],
-    ["hn.algolia.com", [".PoweredBy"]],
+    [
+      "books.com.tw",
+      [
+        "#app_banner",
+        ".ad_pop",
+        ".header_pop"
+      ]
+    ],
+    [
+      "hn.algolia.com",
+      [
+        ".PoweredBy"
+      ]
+    ],
     [
       "m.mobile01.com",
-      ["#_popIniFrame", "#share-bar", ".app-open-btn", "div:has(>[aria-label=\"cookieconsent\"])"]
+      [
+        "#_popIniFrame",
+        "#share-bar",
+        ".app-open-btn",
+        "div:has(>[aria-label=\"cookieconsent\"])"
+      ]
     ],
     [
       "macrumors.com",
-      ["#featured_slider", "div:has(>#featured_slider2)", "div[class^=\"social--\"]"]
+      [
+        "#featured_slider",
+        "div:has(>#featured_slider2)",
+        "div[class^=\"social--\"]"
+      ]
     ],
-    ["nebula.zyxel.com", ["nui-banner:has(.license-banner)"]],
+    [
+      "nebula.zyxel.com",
+      [
+        "nui-banner:has(.license-banner)"
+      ]
+    ],
     [
       "pts.org.tw",
       [
@@ -95,7 +123,12 @@
         "div[id*=crazy_ad]"
       ]
     ],
-    ["vite.dev", [".VPDocAside>:not(.VPDocAsideOutline)"]],
+    [
+      "vite.dev",
+      [
+        ".VPDocAside>:not(.VPDocAsideOutline)"
+      ]
+    ],
     [
       "www.elle.com",
       [
@@ -126,8 +159,19 @@
         "div[id^=\"div-gpt-ad-\"]"
       ]
     ],
-    ["www.newsmarket.com.tw", ["#mob-bot-share", ".kadence-conversion-wrap"]],
-    ["www.sogi.com.tw", ["#cookie-bar"]]
+    [
+      "www.newsmarket.com.tw",
+      [
+        "#mob-bot-share",
+        ".kadence-conversion-wrap"
+      ]
+    ],
+    [
+      "www.sogi.com.tw",
+      [
+        "#cookie-bar"
+      ]
+    ]
   ],
   "sandboxFilters": [
     "*##:root:style(--stylus-bg-dark:#292929)",
@@ -136,8 +180,8 @@
     "*##:root:style(--stylus-text-light:#000)",
     "*##:root:style(--stylus-bg-input-dark:#383838)",
     "*##:root:style(--stylus-bg-input-light:#e0e0e0)",
-    "*##:root:style(--stylus-font-sans-serif:'Inter Variable', system-ui, sans-serif)",
-    "*##:root:style(--stylus-font-monospace:'JetBrains Mono', ui-monospace, monospace)",
+    "*##:root:style(--stylus-font-sans-serif:system-ui, sans-serif)",
+    "*##:root:style(--stylus-font-monospace:ui-monospace, monospace)",
     "*##*:style(text-rendering:auto !important)",
     "*##*:style(font-kerning:normal !important)",
     "*##*:style(font-variant-ligatures:common-ligatures !important)",
