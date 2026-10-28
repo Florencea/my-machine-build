@@ -6,6 +6,16 @@ compatibility: React 19.x, Tailwind CSS 4.x, Vite+
 
 # Modern React 19, Official Best Practices & Tailwind CSS v4 Guidelines
 
+## 0. Authoritative Live Documentation Endpoints
+
+Before authoring components or styles, verify API signatures via live documentation:
+
+- **React 19 Reference**: `webread https://react.dev/reference/react`
+- **Official "You Might Not Need an Effect"**: `webread https://react.dev/learn/you-might-not-need-an-effect`
+- **Tailwind CSS v4 Documentation**: `webread https://tailwindcss.com/docs`
+
+---
+
 ## 1. Component Architecture & Effect Decision Tree
 
 Follow this decision tree when designing components, data flows, and state:
