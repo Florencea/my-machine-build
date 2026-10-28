@@ -1,7 +1,19 @@
 {
-  "version": "2026.1018.2229",
+  "version": "2026.1026.1812",
   "rulesets": [
-    "+jpn-1"
+    "+jpn-1",
+    "+adguard-mobile",
+    "+block-lan",
+    "+adguard-spyware-url",
+    "+annoyances-ai",
+    "+annoyances-cookies",
+    "+annoyances-overlays",
+    "+annoyances-social",
+    "+annoyances-widgets",
+    "+annoyances-others",
+    "+annoyances-notifications",
+    "+ublock-experimental",
+    "+ubol-tests"
   ],
   "filteringModes": {
     "none": [],
