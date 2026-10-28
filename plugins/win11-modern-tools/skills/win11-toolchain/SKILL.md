@@ -80,5 +80,5 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 Modern YouTube media stream URLs (`googlevideo.com`) use Sabr/TVHTML5 token binding. Direct playback via `ffmpeg -i <url>` fails with HTTP `403 Forbidden`. Always download snippets via `yt-dlp` first:
 
 ```powershell
-yt-dlp --download-sections "*00:01:00-00:01:30" --cookies-from-browser chrome -o "clip.mp4" "<url>"
+yt-dlp --download-sections "*00:01:00-00:01:30" --cookies-from-browser edge -o "clip.mp4" "<url>"
 ```

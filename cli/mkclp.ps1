@@ -7,7 +7,7 @@
     - Zero-second lossless stream copying (-c/--copy or compatible local MP4)
     - Hardware-accelerated HEVC (hevc_videotoolbox -tag:v hvc1) on macOS (default Quality: 50)
     - Universal libx264 + AAC fallback on Windows/Linux (default Quality: 23)
-    - Uses yt-dlp --download-sections with browser cookies (default: chrome) and automatic cookie-less fallback
+    - Uses yt-dlp --download-sections with browser cookies (default: edge) and automatic cookie-less fallback
 #>
 
 Set-StrictMode -Version Latest
@@ -21,7 +21,7 @@ Usage: mkclp [options] [input_file_or_url] [from(hh:mm:ss or sec)] [during(sec)]
 Options:
   -q, --quality <num>   Set video quality factor (default: 50 on macOS HEVC, 23 on Windows x264)
   -c, --copy            Force lossless stream copy without re-encoding
-  -b, --browser <name>  Browser for YouTube cookies (default: chrome, or `$env:YT_DLP_BROWSER)
+  -b, --browser <name>  Browser for YouTube cookies (default: edge, or `$env:YT_DLP_BROWSER)
   -o, --output <file>   Custom output file path
   -h, --help            Show this help message
 Examples:
@@ -136,12 +136,12 @@ try {
         $startSec = Convert-TimeToSeconds -TimeStr $Start
         $durSec = Convert-TimeToSeconds -TimeStr $Duration
         $endSec = $startSec + $durSec
-        $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'chrome')
+        $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'edge')
 
         $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ('yt_clip_' + [System.Guid]::NewGuid().ToString('N'))
         $ytFormat = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'
 
-        # Try with browser cookies first (default: chrome), then fallback without cookies
+        # Try with browser cookies first (default: edge), then fallback without cookies
         & yt-dlp --quiet --no-warnings `
             --cookies-from-browser $targetBrowser `
             --force-overwrites `

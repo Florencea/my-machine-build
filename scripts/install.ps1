@@ -147,7 +147,6 @@ foreach ($pkg in $cliPackages) {
 $desktopPackages = @(
     @{ Id = 'Git.Git'; Name = 'Git for Windows' },
     @{ Id = 'Microsoft.VisualStudioCode'; Name = 'Visual Studio Code' },
-    @{ Id = 'Google.Chrome'; Name = 'Google Chrome' },
     @{ Id = 'AgileBits.1Password'; Name = '1Password' },
     @{ Id = 'WinMerge.WinMerge'; Name = 'WinMerge' },
     @{ Id = 'RevoUninstaller.RevoUninstaller'; Name = 'Revo Uninstaller' },

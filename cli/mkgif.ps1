@@ -5,7 +5,7 @@
 .DESCRIPTION
     Cross-platform GIF maker for macOS and Windows 11 (PowerShell 7).
     - Generates high-quality animated GIFs from local videos or YouTube URLs
-    - Uses yt-dlp --download-sections with browser cookies (default: chrome) and cookie-less fallback
+    - Uses yt-dlp --download-sections with browser cookies (default: edge) and cookie-less fallback
     - Uses gifski via PowerShell 7.4+ native byte-stream pipe (yuv4mpegpipe), or FFmpeg 256-color diff palette + Bayer dithering fallback
 #>
 
@@ -22,7 +22,7 @@ Options:
   --fps <num>           Frame rate per second (default: 10)
   -q, --quality <num>   Gifski encoding quality 1-100 (default: 70)
   -l, --lossy           Enable lossy optimization
-  -b, --browser <name>  Browser for YouTube cookies (default: chrome, or `$env:YT_DLP_BROWSER)
+  -b, --browser <name>  Browser for YouTube cookies (default: edge, or `$env:YT_DLP_BROWSER)
   -o, --output <file>   Custom output file path
   -h, --help            Show this help message
 Examples:
@@ -149,12 +149,12 @@ try {
         $durSec = Convert-TimeToSeconds -TimeStr $Duration
         $endSec = $startSec + $durSec
         $ytHeight = ($Width -le 480) ? 480 : (($Width -le 720) ? 720 : (($Width -le 1280) ? 1080 : 2160))
-        $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'chrome')
+        $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'edge')
 
         $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ('yt_gif_' + [System.Guid]::NewGuid().ToString('N'))
         $ytFormat = "bestvideo[height<=$ytHeight]/best[height<=$ytHeight]/bestvideo/best"
 
-        # Try with browser cookies first (default: chrome), then fallback without cookies
+        # Try with browser cookies first (default: edge), then fallback without cookies
         & yt-dlp --quiet --no-warnings `
             --cookies-from-browser $targetBrowser `
             --force-overwrites `
