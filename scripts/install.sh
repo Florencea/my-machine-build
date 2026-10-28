@@ -195,7 +195,7 @@ else
   done
 fi
 
-# 7.5 Deploy Antigravity Plugins (macos-modern-tools & modern-web-stack)
+# 7.5 Deploy Antigravity Plugins (common-modern-tools, macos-modern-tools & modern-web-stack)
 sync_plugin_dir() {
   local plugin_name="$1"
   local src_dir="$REPO_DIR/plugins/$plugin_name"
@@ -212,10 +212,12 @@ sync_plugin_dir() {
   fi
 }
 
+sync_plugin_dir "common-modern-tools"
 sync_plugin_dir "macos-modern-tools"
 sync_plugin_dir "modern-web-stack"
 
 if [[ ! -d "$REPO_DIR/plugins" ]]; then
+  fetch_file "plugins/common-modern-tools/skills/common-toolchain/SKILL.md" "$HOME/.gemini/config/plugins/common-modern-tools/skills/common-toolchain/SKILL.md"
   fetch_file "plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md" "$HOME/.gemini/config/plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md"
   local -a web_skills=(modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
   for skill in "${web_skills[@]}"; do
@@ -421,6 +423,7 @@ install_formulas \
   ast-grep \
   bat \
   duckdb \
+  dust \
   fd \
   ffmpeg \
   gifski \
@@ -428,11 +431,15 @@ install_formulas \
   hyperfine \
   jq \
   mtr \
+  poppler \
   powershell \
   ripgrep \
   sd \
   shfmt \
+  tokei \
   tree \
+  xh \
+  xsv \
   yq \
   yt-dlp \
   zsh-autosuggestions \
@@ -456,109 +463,5 @@ if [[ -d "$HOME/.local/opt/node" ]]; then
   rmdir "$HOME/.local/opt" 2>/dev/null || true
 fi
 
-# 11. Antigravity Global Permission Grants
-configure_antigravity_permissions() {
-  local cfg_dir="$HOME/.gemini/config"
-  local cfg_file="$cfg_dir/config.json"
-  mkdir -p "$cfg_dir"
-
-  local -a default_grants=(
-    "command(actionlint)"
-    "command(ast-grep)"
-    "command(awk)"
-    "command(basename)"
-    "command(bat)"
-    "command(cat)"
-    "command(cut)"
-    "command(date)"
-    "command(df)"
-    "command(diff)"
-    "command(dirname)"
-    "command(du)"
-    "command(duckdb)"
-    "command(echo)"
-    "command(false)"
-    "command(fd)"
-    "command(file)"
-    "command(find)"
-    "command(git add)"
-    "command(git branch)"
-    "command(git check-ignore)"
-    "command(git diff)"
-    "command(git grep)"
-    "command(git log)"
-    "command(git ls-files)"
-    "command(git rev-parse)"
-    "command(git show)"
-    "command(git status)"
-    "command(grep)"
-    "command(head)"
-    "command(hyperfine)"
-    "command(id)"
-    "command(jq)"
-    "command(ls)"
-    "command(printf)"
-    "command(pwd)"
-    "command(pwsh)"
-    "command(readlink)"
-    "command(realpath)"
-    "command(rg)"
-    "command(ripgrep)"
-    "command(sd)"
-    "command(sg)"
-    "command(shfmt)"
-    "command(sort)"
-    "command(stat)"
-    "command(sw_vers)"
-    "command(tail)"
-    "command(test)"
-    "command(tr)"
-    "command(tree)"
-    "command(true)"
-    "command(uname)"
-    "command(uniq)"
-    "command(wc)"
-    "command(which)"
-    "command(whoami)"
-    "command(yq)"
-    "command(vp build)"
-    "command(vp cache clean)"
-    "command(vp check)"
-    "command(vp exec)"
-    "command(vp fmt)"
-    "command(vp format)"
-    "command(vp lint)"
-    "command(vp list)"
-    "command(vp ls)"
-    "command(vp node)"
-    "command(vp outdated)"
-    "command(vp pack)"
-    "command(vp preview)"
-    "command(vp test)"
-    "command(vp toolchain)"
-    "command(regex:vp run (agent:.*|verify|typecheck|check.*|lint.*|test.*|build.*))"
-    "command(regex:vpr (agent:.*|verify|typecheck|check.*|lint.*|test.*|build.*|--last-details|--no-cache))"
-    "command(regex:vpx (oxfmt|oxlint).*)"
-  )
-
-  local grants_json
-  grants_json="$(printf '%s\n' "${default_grants[@]}" | jq -R . | jq -s .)"
-
-  if [[ ! -s "$cfg_file" ]]; then
-    jq -n --argjson grants "$grants_json" \
-      '{userSettings: {globalPermissionGrants: {allow: $grants}}}' >"$cfg_file"
-  else
-    local tmp_cfg
-    tmp_cfg="$(mktemp -t antigravity_cfg.XXXXXX)"
-    jq --argjson grants "$grants_json" \
-      '.userSettings.globalPermissionGrants.allow = (((.userSettings.globalPermissionGrants.allow // []) + $grants) | unique)' \
-      "$cfg_file" >"$tmp_cfg"
-    mv -f "$tmp_cfg" "$cfg_file"
-  fi
-  chmod 600 "$cfg_file"
-}
-
-configure_antigravity_permissions
-
-# 12. Flush preferences cache before reboot
+# 11. Flush preferences cache before reboot
 killall cfprefsd 2>/dev/null || true

@@ -4,13 +4,13 @@ This document outlines the core development workflow, code formatting standards,
 
 ## 1. Quick Architecture Map
 
-| Layer                   | Path                                            | Responsibility                                                                                                 |
-| :---------------------- | :---------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
-| **CLI Tools**           | `cli/*.ps1`                                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands (symlinked to `~/.local/bin` on macOS; User `PATH` on Win11) |
-| **Dotfiles & Configs**  | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                       |
-| **Antigravity Plugins** | `plugins/`                                      | Platform & web stack bundles (`macos-modern-tools`, `win11-modern-tools`, `modern-web-stack`)                  |
-| **Installers**          | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                 |
-| **Workspace Rules**     | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                              |
+| Layer                   | Path                                            | Responsibility                                                                                                                                 |
+| :---------------------- | :---------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI Tools**           | `cli/*.ps1`                                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands (symlinked to `~/.local/bin` on macOS; User `PATH` on Win11)                                 |
+| **Dotfiles & Configs**  | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                                                       |
+| **Antigravity Plugins** | `plugins/`                                      | Cross-platform toolchain, platform & web stack bundles (`common-modern-tools`, `macos-modern-tools`, `win11-modern-tools`, `modern-web-stack`) |
+| **Installers**          | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                                                 |
+| **Workspace Rules**     | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                                                              |
 
 ---
 

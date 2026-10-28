@@ -1,4 +1,4 @@
 {
   "name": "win11-modern-tools",
-  "description": "Universal Windows 11 modern CLI toolchain (rg, fd, ast-grep, tokei, xsv, sqlite3, xh, dust, jq, yq, bat, sd, shfmt, pdftotext, duckdb, actionlint, hyperfine, pwsh / PowerShell 7, Vite+), subshell stdin safety, token discipline, and git commit guard."
+  "description": "Windows 11 platform execution rules, subshell stdin safety guardrails, PowerShell 5.1 vs 7 runtime isolation, and Dev Drive optimization."
 }

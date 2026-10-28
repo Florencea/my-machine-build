@@ -18,17 +18,17 @@ Write-Host "=== Starting Windows 11 Modern Dev Environment Setup ===" -Foregroun
 # 1. Dev Drive & Workspace Initialization
 $workspaceDir = "E:\_Workspace"
 if (-not (Test-Path -LiteralPath $workspaceDir)) {
-    Write-Host "[1/9] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
+    Write-Host "[1/8] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
     New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
 }
 else {
-    Write-Host "[1/9] Workspace Directory verified: $workspaceDir" -ForegroundColor DarkGray
+    Write-Host "[1/8] Workspace Directory verified: $workspaceDir" -ForegroundColor DarkGray
 }
 
 # 2. Vite+ Home & Cache Relocation (E:\vite-plus)
 $vpHome = "E:\vite-plus"
 if ([Environment]::GetEnvironmentVariable("VP_HOME", "User") -ne $vpHome) {
-    Write-Host "[2/9] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
+    Write-Host "[2/8] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
     [Environment]::SetEnvironmentVariable("VP_HOME", $vpHome, "User")
     $env:VP_HOME = $vpHome
 }
@@ -43,7 +43,7 @@ if (-not (Get-Command "vp" -ErrorAction SilentlyContinue)) {
     }
 }
 else {
-    Write-Host "[2/9] Vite+ toolchain is ready." -ForegroundColor DarkGray
+    Write-Host "[2/8] Vite+ toolchain is ready." -ForegroundColor DarkGray
 }
 
 # 3. Idempotent Winget Package Installation
@@ -66,7 +66,7 @@ function Install-WingetIdempotent {
     }
 }
 
-Write-Host "[3/9] Checking & Installing Modern CLI Tools and Desktop Apps..." -ForegroundColor Cyan
+Write-Host "[3/8] Checking & Installing Modern CLI Tools and Desktop Apps..." -ForegroundColor Cyan
 
 $cliPackages = @(
     @{ Id = "Microsoft.PowerShell"; Name = "PowerShell 7" },
@@ -112,7 +112,7 @@ foreach ($pkg in $desktopPackages) {
 & winget pin add --id Microsoft.Edge --blocking 2>$null | Out-Null
 
 # 4. Global Git Configuration & Pre-Commit Safety Hook
-Write-Host "[4/9] Configuring Global Git Settings & Pre-Commit Hook..." -ForegroundColor Cyan
+Write-Host "[4/8] Configuring Global Git Settings & Pre-Commit Hook..." -ForegroundColor Cyan
 $scriptDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent $scriptDir
 
@@ -149,7 +149,7 @@ if (Test-Path -LiteralPath $srcPreCommit) {
 }
 
 # 5. Windows Terminal & VS Code Configuration
-Write-Host "[5/9] Configuring Terminal Defaults to PowerShell 7..." -ForegroundColor Cyan
+Write-Host "[5/8] Configuring Terminal Defaults to PowerShell 7..." -ForegroundColor Cyan
 $wtSettings = Join-Path $env:LOCALAPPDATA "Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
 if (Test-Path -LiteralPath $wtSettings) {
     try {
@@ -180,7 +180,7 @@ if (Test-Path -LiteralPath $codeSettings) {
 }
 
 # 6. PowerShell 7 Profile Setup ($PROFILE)
-Write-Host "[6/9] Setting up PowerShell 7 `$PROFILE..." -ForegroundColor Cyan
+Write-Host "[6/8] Setting up PowerShell 7 `$PROFILE..." -ForegroundColor Cyan
 $ps7Dir = Join-Path $HOME "Documents\PowerShell"
 if (-not (Test-Path -LiteralPath $ps7Dir)) {
     New-Item -ItemType Directory -Force -Path $ps7Dir | Out-Null
@@ -199,14 +199,14 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 '@
 [System.IO.File]::WriteAllText($profilePath, $profileContent, $utf8NoBom)
 
-# 7. Sync Antigravity Plugins (win11-modern-tools & modern-web-stack)
-Write-Host "[7/9] Syncing Antigravity Plugins..." -ForegroundColor Cyan
+# 7. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
+Write-Host "[7/8] Syncing Antigravity Plugins..." -ForegroundColor Cyan
 $pluginsDestRoot = Join-Path $HOME ".gemini\config\plugins"
 if (-not (Test-Path -LiteralPath $pluginsDestRoot)) {
     New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
 }
 
-foreach ($pluginName in @("win11-modern-tools", "modern-web-stack")) {
+foreach ($pluginName in @("common-modern-tools", "win11-modern-tools", "modern-web-stack")) {
     $srcPlugin = Join-Path $repoRoot "plugins\$pluginName"
     $destPlugin = Join-Path $pluginsDestRoot $pluginName
     if (Test-Path -LiteralPath $srcPlugin) {
@@ -226,81 +226,8 @@ foreach ($legacyDir in @("rules", "skills")) {
     }
 }
 
-# 8. Configure Antigravity Global Permission Grants
-Write-Host "[8/9] Configuring Antigravity Global Permission Grants..." -ForegroundColor Cyan
-$agyCfgDir = Join-Path $HOME ".gemini\config"
-$agyCfgFile = Join-Path $agyCfgDir "config.json"
-if (-not (Test-Path -LiteralPath $agyCfgDir)) {
-    New-Item -ItemType Directory -Force -Path $agyCfgDir | Out-Null
-}
-
-$defaultGrants = @(
-    "command(actionlint)",
-    "command(ast-grep)",
-    "command(bat)",
-    "command(duckdb)",
-    "command(dust)",
-    "command(fd)",
-    "command(git add)",
-    "command(git branch)",
-    "command(git check-ignore)",
-    "command(git diff)",
-    "command(git grep)",
-    "command(git log)",
-    "command(git ls-files)",
-    "command(git rev-parse)",
-    "command(git show)",
-    "command(git status)",
-    "command(hyperfine)",
-    "command(jq)",
-    "command(pdftotext)",
-    "command(pwsh)",
-    "command(rg)",
-    "command(ripgrep)",
-    "command(sd)",
-    "command(sg)",
-    "command(shfmt)",
-    "command(sqlite3)",
-    "command(tokei)",
-    "command(xh)",
-    "command(xsv)",
-    "command(yq)",
-    "command(vp build)",
-    "command(vp cache clean)",
-    "command(vp check)",
-    "command(vp exec)",
-    "command(vp fmt)",
-    "command(vp format)",
-    "command(vp lint)",
-    "command(vp list)",
-    "command(vp ls)",
-    "command(vp node)",
-    "command(vp outdated)",
-    "command(vp pack)",
-    "command(vp preview)",
-    "command(vp test)",
-    "command(vp toolchain)",
-    "command(regex:vp run (agent:.*|verify|typecheck|check.*|lint.*|test.*|build.*))",
-    "command(regex:vpr (agent:.*|verify|typecheck|check.*|lint.*|test.*|build.*|--last-details|--no-cache))",
-    "command(regex:vpx (oxfmt|oxlint).*)"
-)
-
-if (Get-Command "jq" -ErrorAction SilentlyContinue) {
-    $grantsJson = ($defaultGrants | ConvertTo-Json -Compress)
-    if (-not (Test-Path -LiteralPath $agyCfgFile) -or ((Get-Item -LiteralPath $agyCfgFile).Length -eq 0)) {
-        $newCfg = (& jq -n --argjson grants $grantsJson '{userSettings: {globalPermissionGrants: {allow: $grants}}}') -join "`n"
-        [System.IO.File]::WriteAllText($agyCfgFile, $newCfg + "`n", $utf8NoBom)
-    }
-    else {
-        $updatedCfg = (& jq --argjson grants $grantsJson '.userSettings.globalPermissionGrants.allow = (((.userSettings.globalPermissionGrants.allow // []) + $grants) | unique)' $agyCfgFile) -join "`n"
-        if ($LASTEXITCODE -eq 0 -and $updatedCfg) {
-            [System.IO.File]::WriteAllText($agyCfgFile, $updatedCfg + "`n", $utf8NoBom)
-        }
-    }
-}
-
-# 9. Register Repository CLI Directory & Prune Stale User PATH
-Write-Host "[9/9] Registering CLI Directory and Pruning Stale User PATH Entries..." -ForegroundColor Cyan
+# 8. Register Repository CLI Directory & Prune Stale User PATH
+Write-Host "[8/8] Registering CLI Directory and Pruning Stale User PATH Entries..." -ForegroundColor Cyan
 $cliDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir "..\cli")).Path
 $rawUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 $currentUserPath = @()

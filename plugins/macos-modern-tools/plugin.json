@@ -1,4 +1,4 @@
 {
   "name": "macos-modern-tools",
-  "description": "macOS Darwin modern CLI toolchain (rg, fd, ast-grep, jq, yq, bat, sd, duckdb, htmlq, actionlint, hyperfine, shfmt, pwsh, Vite+), BSD compatibility guardrails, and git commit safety."
+  "description": "macOS Darwin platform execution rules, BSD compatibility guardrails, idiomatic Zsh standards, and Apple system defaults."
 }

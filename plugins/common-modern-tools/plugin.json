@@ -1,0 +1,4 @@
+{
+  "name": "common-modern-tools",
+  "description": "Cross-platform modern CLI toolchain (rg, fd, ast-grep, tokei, bat, sd, jq, yq, duckdb, sqlite3, xsv, xh, dust, pdftotext, shfmt, actionlint, hyperfine, pwsh, Vite+), token discipline, live doc matrix, and git commit safety."
+}

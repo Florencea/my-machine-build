@@ -10,14 +10,18 @@ description: Rules for creating, structuring, and maintaining Antigravity Plugin
 
 All Antigravity customizations are packaged as **Plugins** under `plugins/<plugin-name>/` and deployed to `~/.gemini/config/plugins/<plugin-name>/`:
 
+- **`plugins/common-modern-tools/`** (Shared across macOS & Windows 11):
+  - `plugin.json`: Manifest for universal cross-platform CLI toolchain bundle.
+  - `rules/AGENTS.md`: Universal CLI priorities, zero-throwaway script policy, live query mandate, token discipline, and git commit safety.
+  - `skills/common-toolchain/SKILL.md`: 4-tier tool selection hierarchy, progressive reconnaissance (L0-L4), custom CLI helpers (`cli/*.ps1`), and authoritative live doc matrix.
 - **`plugins/macos-modern-tools/`** (macOS only):
-  - `plugin.json`: Manifest for macOS toolchain bundle.
-  - `rules/AGENTS.md`: macOS Darwin execution rules, BSD compatibility traps, and git commit guard.
-  - `skills/macos-toolchain/SKILL.md`: macOS CLI decision tree and live query endpoints.
+  - `plugin.json`: Manifest for macOS platform bundle.
+  - `rules/AGENTS.md`: macOS Darwin execution rules, BSD compatibility traps, idiomatic Zsh standards, and Apple defaults.
+  - `skills/macos-toolchain/SKILL.md`: macOS BSD workarounds, Darwin system automation (`defaults`, `PlistBuddy`), and Zsh recipes.
 - **`plugins/win11-modern-tools/`** (Windows 11 only):
-  - `plugin.json`: Manifest for Windows 11 toolchain bundle.
-  - `rules/AGENTS.md`: Windows 11 execution rules, subshell stdin protection, token discipline, and `pwsh` protocol.
-  - `skills/win11-toolchain/SKILL.md`: Windows 11 4-tier tool selection hierarchy and recipes.
+  - `plugin.json`: Manifest for Windows 11 platform bundle.
+  - `rules/AGENTS.md`: Windows 11 platform rules, subshell stdin protection, PowerShell 5.1 vs 7 isolation, and Dev Drive optimization.
+  - `skills/win11-toolchain/SKILL.md`: Windows 11 subshell stdin defense recipes, PowerShell compatibility, and array unwrapping guard.
 - **`plugins/modern-web-stack/`** (Shared across macOS & Windows 11):
   - `plugin.json`: Manifest for cross-platform web development stack.
   - `rules/AGENTS.md`: Consolidated always-on rules for Node.js, TypeScript 5+, React 19, Tailwind CSS v4, Vitest Browser testing, and GitHub Actions CI (`actionlint`).
