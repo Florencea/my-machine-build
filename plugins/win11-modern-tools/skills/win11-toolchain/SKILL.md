@@ -126,14 +126,94 @@ To maximize agent precision and eliminate context bloat, execute tasks along fiv
 
 ---
 
-## 4. Pre-Execution Live Query & Authoritative Endpoints
+## 4. Comprehensive Authoritative Live Documentation Matrix
 
-Always query authoritative live endpoints via `webread --llms <url>`, `webread <url>`, or `<cmd> --help` before authoring code:
+**MANDATORY LOOK-BEFORE-LEAP INVARIANT:**
+Agents MUST actively inspect official documentation or run `<tool> --help` before composing commands, scripts, or workflows for ANY of the following installed tools. NEVER guess CLI flags, filter syntax, or API options from pre-training memory.
 
-- **PowerShell 7 (`pwsh`)**:
-  - Syntax outline: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
-  - Parameter list: `pwsh -NoLogo -NoProfile -Command "(Get-Command <cmdlet>).Parameters.Keys"`
-  - Official reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
+### 4.1 Multimedia Processing (CRITICAL: Never Guess Filtergraphs or Stream Flags)
+
+- **`yt-dlp`**:
+  - Official Reference: `webread https://github.com/yt-dlp/yt-dlp#usage-and-options`
+  - CLI Help: `yt-dlp --help`
+  - _Mandate_: Always run `yt-dlp --help` to confirm options like `--download-sections "*<START>-<END>"`, `--cookies-from-browser <browser>`, and `-f <format>`. Never guess extractor arguments.
+- **`ffmpeg` & `ffprobe`**:
+  - Official Documentation: `webread https://ffmpeg.org/ffmpeg.html` (and `webread https://ffmpeg.org/ffprobe.html`)
+  - Official Wiki & Guides: `https://trac.ffmpeg.org/wiki`
+  - CLI Help: `ffmpeg -h full` / `ffmpeg -h filter=<name>` / `ffprobe -h`
+  - _Mandate_: Video filters (`-vf`), audio maps (`-map`), pixel formats (`-pix_fmt`), and codec options vary drastically across versions. Verify the exact syntax via `ffmpeg -h` or official docs before running complex encoding pipelines.
+- **`gifski`**:
+  - Official Reference: `webread https://github.com/ImageOptim/gifski`
+  - CLI Help: `gifski --help`
+
+### 4.2 Data Analytics, SQL & Persistence
+
+- **`duckdb`**:
+  - LLM Full Reference: `webread --llms https://duckdb.org` (or `https://duckdb.org/docs/`)
+  - CLI Help: `duckdb --help`
+- **`sqlite3`**:
+  - Official CLI Reference: `https://www.sqlite.org/cli.html`
+  - CLI Help: `sqlite3 --help`
+- **`xsv`**:
+  - Official Manual: `https://github.com/BurntSushi/xsv`
+  - CLI Help: `xsv --help`
+
+### 4.3 Code Intelligence, Structural Search & Preview
+
+- **`ast-grep` (`sg`)**:
+  - LLM Full Reference: `webread --llms https://ast-grep.github.io`
+  - CLI Help: `ast-grep --help`
+- **`ripgrep` (`rg`)**:
+  - User Guide: `webread https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md`
+  - CLI Help: `rg --help`
+- **`fd`**:
+  - Official README: `webread https://github.com/sharkdp/fd`
+  - CLI Help: `fd --help`
+- **`bat`**:
+  - Official README: `webread https://github.com/sharkdp/bat`
+  - CLI Help: `bat --help`
+- **`tokei`**:
+  - Official README: `webread https://github.com/XAMPPRocky/tokei`
+  - CLI Help: `tokei --help`
+
+### 4.4 Text Replacement, Data Formatting & Documents
+
+- **`sd`**:
+  - Official README: `webread https://github.com/chmln/sd`
+  - CLI Help: `sd --help`
+- **`jq`**:
+  - Official Manual: `webread https://jqlang.github.io/jq/manual/`
+  - CLI Help: `jq --help`
+- **`yq`**:
+  - Official Docs: `webread https://mikefarah.gitbook.io/yq/`
+  - CLI Help: `yq --help`
+- **`shfmt`**:
+  - Official README: `webread https://github.com/mvdan/sh`
+  - CLI Help: `shfmt --help`
+- **`pdftotext` (Poppler)**:
+  - Official Manpage: `webread https://linux.die.net/man/1/pdftotext`
+  - CLI Help: `pdftotext -h`
+
+### 4.5 Networking, Benchmarking, Security & CI
+
+- **`xh`**:
+  - Official Manual: `webread https://github.com/ducaale/xh`
+  - CLI Help: `xh --help`
+- **`hyperfine`**:
+  - Official README: `webread https://github.com/sharkdp/hyperfine`
+  - CLI Help: `hyperfine --help`
+- **`actionlint`**:
+  - Official Usage: `webread https://github.com/rhysd/actionlint/blob/main/docs/usage.md`
+  - CLI Help: `actionlint -help`
+- **`1Password CLI` (`op`)**:
+  - Developer Reference: `https://developer.1password.com/docs/cli/reference/`
+  - CLI Help: `op --help`
+- **`dust`**:
+  - Official README: `webread https://github.com/bootandy/dust`
+  - CLI Help: `dust --help`
+
+### 4.6 Web Stack, Language Toolchains & Runtimes
+
 - **Vite+ Toolchain (`vp`, `vpx`, `vpr`)**:
   - LLM Full Reference: `webread --llms https://viteplus.dev` (or `https://viteplus.dev/llms-full.txt`)
   - CLI Help: `vp help` / `vp --help`
@@ -144,14 +224,16 @@ Always query authoritative live endpoints via `webread --llms <url>`, `webread <
   - React Reference: `webread https://react.dev/reference/react`
   - React Best Practices: `webread https://react.dev/learn/you-might-not-need-an-effect`
   - Tailwind v4 Reference: `webread https://tailwindcss.com/docs`
-- **ast-grep (`ast-grep`)**:
-  - LLM Reference: `webread --llms https://ast-grep.github.io`
-  - CLI Help: `ast-grep --help`
-- **DuckDB**:
-  - LLM Reference: `webread --llms https://duckdb.org`
-  - CLI Help: `duckdb --help`
+- **PowerShell 7 (`pwsh`)**:
+  - Syntax Outline: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
+  - Official Reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
 - **Node.js (Active LTS)**:
   - Built-in APIs: Query local type declarations or inspect `https://nodejs.org/api/`
+
+### 4.7 Custom Local CLI Helpers (`cli/*.ps1` on PATH)
+
+- ALWAYS treat as black boxes and run `<command> --help` before execution:
+  - `webread --help`, `clall --help`, `ebk --help`, `mdig --help`, `mkclp --help`, `mkgif --help`, `mmb --help`, `rea --help`, `ua --help`, `unodev --help`, `up --help`.
 
 ---
 

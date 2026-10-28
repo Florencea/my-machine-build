@@ -27,6 +27,10 @@
     3. **Local TypeScript / Package Boundaries**: Inspect actual type declarations (`node_modules/<pkg>/**/*.d.ts`) or `package.json` manifest (`vp pm pkg get <key>`).
     4. **Web Search Fallback**: Use `search_web` to locate authoritative documentation endpoints when official paths are unknown.
   - Writing code without active live verification is strictly categorized as a **Verification Gate Failure**.
+- **Multimedia & Complex CLI Pipeline Mandate (ffmpeg, yt-dlp, gifski)**:
+  - NEVER compose `ffmpeg` filtergraphs (`-filter_complex`, `-vf`), stream mappings (`-map`), or codec flags from memory.
+  - NEVER invoke `yt-dlp` stream extraction or section download arguments (`--download-sections`, `--cookies-from-browser`, `-f`) without verifying options first via `yt-dlp --help` or official documentation.
+  - Guessing arguments for multimedia CLI tools is strictly prohibited and immediately treated as a protocol violation.
 - **No Fragile Version Pinning**:
   - NEVER hardcode minor/patch versions or assume fixed runtime versions from memory.
   - Dynamically inspect `package.json` (`engines.node`, `dependencies`) or `<tool> --version`.

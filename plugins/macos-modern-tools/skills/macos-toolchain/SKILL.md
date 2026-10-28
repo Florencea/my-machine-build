@@ -62,33 +62,114 @@ In accordance with Antigravity Best Practices, treat local project helper script
 
 ---
 
-## 3. Pre-Execution Live Query & Authoritative Documentation Endpoints
+## 3. Comprehensive Authoritative Live Documentation Matrix
 
-Before executing unfamiliar commands or authoring configs, query these verified endpoints using `webread <url>` or `<command> --help`:
+**MANDATORY LOOK-BEFORE-LEAP INVARIANT:**
+Agents MUST actively inspect official documentation or run `<tool> --help` before composing commands, scripts, or workflows for ANY of the following installed tools. NEVER guess CLI flags, filter syntax, or API options from pre-training memory.
+
+### 3.1 Multimedia Processing (CRITICAL: Never Guess Filtergraphs or Stream Flags)
+
+- **`yt-dlp`**:
+  - Official Reference: `webread https://github.com/yt-dlp/yt-dlp#usage-and-options`
+  - CLI Help: `yt-dlp --help`
+  - _Mandate_: Always run `yt-dlp --help` to confirm options like `--download-sections "*<START>-<END>"`, `--cookies-from-browser <browser>`, and `-f <format>`. Never guess extractor arguments.
+- **`ffmpeg` & `ffprobe`**:
+  - Official Documentation: `webread https://ffmpeg.org/ffmpeg.html` (and `webread https://ffmpeg.org/ffprobe.html`)
+  - Official Wiki & Guides: `https://trac.ffmpeg.org/wiki`
+  - CLI Help: `ffmpeg -h full` / `ffmpeg -h filter=<name>` / `ffprobe -h`
+  - _Mandate_: Video filters (`-vf`), audio maps (`-map`), pixel formats (`-pix_fmt`), and codec options vary drastically across versions. Verify the exact syntax via `ffmpeg -h` or official docs before running complex encoding pipelines.
+- **`gifski`**:
+  - Official Reference: `webread https://github.com/ImageOptim/gifski`
+  - CLI Help: `gifski --help`
+
+### 3.2 Data Analytics, SQL & Persistence
+
+- **`duckdb`**:
+  - LLM Full Reference: `webread --llms https://duckdb.org` (or `https://duckdb.org/docs/`)
+  - CLI Help: `duckdb --help`
+- **`sqlite3`**:
+  - Official CLI Reference: `https://www.sqlite.org/cli.html`
+  - CLI Help: `sqlite3 --help`
+- **`xsv`**:
+  - Official Manual: `https://github.com/BurntSushi/xsv`
+  - CLI Help: `xsv --help`
+
+### 3.3 Code Intelligence, Structural Search & Preview
+
+- **`ast-grep` (`sg`)**:
+  - LLM Full Reference: `webread --llms https://ast-grep.github.io`
+  - CLI Help: `sg --help`
+- **`ripgrep` (`rg`)**:
+  - User Guide: `webread https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md`
+  - CLI Help: `rg --help`
+- **`fd`**:
+  - Official README: `webread https://github.com/sharkdp/fd`
+  - CLI Help: `fd --help`
+- **`bat`**:
+  - Official README: `webread https://github.com/sharkdp/bat`
+  - CLI Help: `bat --help`
+- **`tokei`**:
+  - Official README: `webread https://github.com/XAMPPRocky/tokei`
+  - CLI Help: `tokei --help`
+
+### 3.4 Text Replacement, Data Formatting & Documents
+
+- **`sd`**:
+  - Official README: `webread https://github.com/chmln/sd`
+  - CLI Help: `sd --help`
+- **`jq`**:
+  - Official Manual: `webread https://jqlang.github.io/jq/manual/`
+  - CLI Help: `jq --help`
+- **`yq`**:
+  - Official Docs: `webread https://mikefarah.gitbook.io/yq/`
+  - CLI Help: `yq --help`
+- **`shfmt`**:
+  - Official README: `webread https://github.com/mvdan/sh`
+  - CLI Help: `shfmt --help`
+- **`pdftotext` (Poppler)**:
+  - Official Manpage: `webread https://linux.die.net/man/1/pdftotext`
+  - CLI Help: `pdftotext -h`
+
+### 3.5 Networking, Benchmarking, Security & CI
+
+- **`xh`**:
+  - Official Manual: `webread https://github.com/ducaale/xh`
+  - CLI Help: `xh --help`
+- **`hyperfine`**:
+  - Official README: `webread https://github.com/sharkdp/hyperfine`
+  - CLI Help: `hyperfine --help`
+- **`actionlint`**:
+  - Official Usage: `webread https://github.com/rhysd/actionlint/blob/main/docs/usage.md`
+  - CLI Help: `actionlint -help`
+- **`1Password CLI` (`op`)**:
+  - Developer Reference: `https://developer.1password.com/docs/cli/reference/`
+  - CLI Help: `op --help`
+- **`dust`**:
+  - Official README: `webread https://github.com/bootandy/dust`
+  - CLI Help: `dust --help`
+
+### 3.6 Web Stack, Language Toolchains & Runtimes
 
 - **Vite+ Toolchain (`vp`, `vpx`, `vpr`)**:
   - LLM Full Reference: `webread --llms https://viteplus.dev` (or `https://viteplus.dev/llms-full.txt`)
   - CLI Help: `vp help` / `vp --help`
 - **Oxc (`oxfmt`, `oxlint`)**:
   - LLM Reference: `webread --llms https://oxc.rs` (or `https://oxc.rs/llms.txt`)
-  - CLI Help: `vpx oxlint --help`, `vpx oxfmt --help` (or `vp lint --help`, `vp fmt --help`)
-- **PowerShell 7 (`pwsh`)**:
-  - Cmdlet Syntax: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
-  - Official Docs: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
+  - CLI Help: `vpx oxlint --help`, `vpx oxfmt --help`
 - **React 19 & Tailwind CSS v4**:
   - React Reference: `webread https://react.dev/reference/react`
-  - You Might Not Need an Effect: `webread https://react.dev/learn/you-might-not-need-an-effect`
+  - React Best Practices: `webread https://react.dev/learn/you-might-not-need-an-effect`
   - Tailwind v4 Reference: `webread https://tailwindcss.com/docs`
-- **ast-grep (`sg`)**:
-  - LLM Reference: `webread --llms https://ast-grep.github.io`
-  - CLI Help: `sg --help`
-- **DuckDB**:
-  - LLM Reference: `webread --llms https://duckdb.org`
-  - CLI Help: `duckdb --help`
-- **Modern CLI Binaries**:
-  - `rg --help`, `fd --help`, `bat --help`, `jq --help`, `yq --help`, `sd --help`, `actionlint -help`
+- **PowerShell 7 (`pwsh`)**:
+  - Syntax Outline: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
+  - Official Reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
 - **Node.js (Active LTS)**:
   - Built-in APIs: Query local type declarations or inspect `https://nodejs.org/api/`
+
+### 3.7 Custom Local CLI Helpers (`~/.local/bin` on PATH)
+
+- ALWAYS treat as black boxes and run `<command> --help` before execution:
+  - `webread --help`, `clall --help`, `ebk --help`, `mdig --help`, `mkclp --help`, `mkgif --help`, `mmb --help`, `rea --help`, `ua --help`, `unodev --help`, `up --help`.
 
 ---
 
