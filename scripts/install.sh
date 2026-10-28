@@ -295,8 +295,6 @@ install_formulas() {
 # Install all casks in one batch for better resolution speed
 install_casks \
   1password-cli \
-  font-jetbrains-mono \
-  font-inter \
   istat-menus@6 \
   logi-options+ \
   1password \
