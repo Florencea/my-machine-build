@@ -11,11 +11,11 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 clall: Clone all GitHub Repositories for the authenticated user
 Usage: clall [GITHUB_ACCESS_TOKEN]
        clall ghp_000000000000000000000000000000000000
-"@
+'@
 }
 
 $Token = ''

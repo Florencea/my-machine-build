@@ -11,11 +11,11 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 rea: ASS-Combiner: combine .cht.ass into original mkv as default subtitle track
 Usage: rea [input_dir]
        rea 'input'
-"@
+'@
 }
 
 $InputDir = ''

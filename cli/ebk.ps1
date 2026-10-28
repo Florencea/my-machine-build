@@ -11,10 +11,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 ebk: Backup and sync browser extension configuration files
 Usage: ebk
-"@
+'@
 }
 
 foreach ($rawArg in $args) {

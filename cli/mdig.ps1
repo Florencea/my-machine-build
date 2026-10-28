@@ -12,11 +12,11 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 mdig: Multi-dig: Check DNS records on different DNS servers at once
 Usage: mdig [domain]
        mdig 'is1-ssl.mzstatic.com'
-"@
+'@
 }
 
 $Domain = ''

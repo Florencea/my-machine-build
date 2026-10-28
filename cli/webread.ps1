@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 webread: Clean, token-efficient, secure webpage and documentation reader for agents and humans.
 
 Usage:
@@ -39,7 +39,7 @@ Examples:
   webread https://react.dev/learn/you-might-not-need-an-effect
   webread -s 'article' https://oxc.rs
   webread --raw https://example.com -o page.html
-"@
+'@
 }
 
 # Resolve script root (handles extensionless symlinks on macOS ~/.local/bin/webread)
@@ -67,10 +67,10 @@ if (-not $realScriptDir) {
     $realScriptDir = [System.IO.Path]::GetDirectoryName((Get-Process -Id $PID).Path)
 }
 
-$parserScript = Join-Path $realScriptDir "helpers" "webread-parser.ts"
+$parserScript = Join-Path $realScriptDir 'helpers' 'webread-parser.ts'
 if (-not (Test-Path -LiteralPath $parserScript)) {
     # Fallback to search relative to current directory
-    $candidate = Join-Path (Get-Location) "cli" "helpers" "webread-parser.ts"
+    $candidate = Join-Path (Get-Location) 'cli' 'helpers' 'webread-parser.ts'
     if (Test-Path -LiteralPath $candidate) {
         $parserScript = $candidate
     }
@@ -193,7 +193,7 @@ function Invoke-LocalParser {
     }
 
     # Fallback to direct output if parser is not available
-    [Console]::Error.WriteLine("Notice: webread-parser.ts not found, outputting direct fetch.")
+    [Console]::Error.WriteLine('Notice: webread-parser.ts not found, outputting direct fetch.')
     return $RawInput
 }
 
@@ -232,14 +232,14 @@ function Get-WebreadContent {
 
     # 2. Opt-in External Jina Reader
     if ($UseJina) {
-        [Console]::Error.WriteLine("Notice: Using external Jina Reader service (r.jina.ai)...")
+        [Console]::Error.WriteLine('Notice: Using external Jina Reader service (r.jina.ai)...')
         $jinaUrl = "https://r.jina.ai/$UrlToFetch"
         $content = & $curlCmd -sL --max-time 15 -H 'X-No-Cache: true' "$jinaUrl" 2>$null
 
         if ($LASTEXITCODE -eq 0 -and $content -and ($content -notmatch 'Request failed with status code')) {
             return (Invoke-LocalParser -RawInput $content -SourceUrl $UrlToFetch)
         }
-        [Console]::Error.WriteLine("Notice: External Jina Reader unavailable, falling back to local reader...")
+        [Console]::Error.WriteLine('Notice: External Jina Reader unavailable, falling back to local reader...')
     }
 
     # 3. Local-First Safe Fetch (Default)

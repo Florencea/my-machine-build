@@ -11,10 +11,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 up: Check and update Node.js package dependencies with clean spinner feedback
 Usage: up
-"@
+'@
 }
 
 foreach ($rawArg in $args) {

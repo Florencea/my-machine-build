@@ -11,10 +11,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 unodev: Sync and update Node.js version in package.json engines.node for all local workspace projects
 Usage: unodev
-"@
+'@
 }
 
 foreach ($rawArg in $args) {

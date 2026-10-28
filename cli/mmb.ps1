@@ -11,10 +11,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 mmb: Open current build workspace in Visual Studio Code
 Usage: mmb
-"@
+'@
 }
 
 foreach ($rawArg in $args) {

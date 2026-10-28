@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Show-Help {
-    Write-Output @"
+    Write-Output @'
 ua: Upgrade system packages (Homebrew / winget), update Node.js (Active LTS via Vite+), and sync git repositories
 Usage: ua [options]
 Options:
@@ -20,7 +20,7 @@ Options:
   --skip-vite     Skip Vite+ and Node.js LTS update
   --skip-git      Skip workspace Git repositories sync
   -h, --help      Show this help message
-"@
+'@
 }
 
 $SkipBrew = $false
