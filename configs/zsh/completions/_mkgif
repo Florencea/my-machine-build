@@ -17,56 +17,56 @@ _mkgif() {
     '3:Duration (Seconds): ' && ret=0
 
   case "$state" in
-  fps)
-    local -a fps_list
-    fps_list=(
-      '8:Low framerate'
-      '10:Default framerate'
-      '12:Lightweight GIF'
-      '15:Smooth animation'
-      '24:Full motion'
-    )
-    _describe -t fps_list 'Frame Rate' fps_list && ret=0
-    ;;
-  width)
-    local -a widths
-    widths=(
-      '480:Standard sweet spot'
-      '640:High definition'
-      '720:Large (default)'
-      '1280:HD'
-    )
-    _describe -t widths 'Width (px)' widths && ret=0
-    ;;
-  quality)
-    local -a qualities
-    qualities=(
-      '60:Lower quality'
-      '70:Default sweet spot'
-      '80:High quality'
-      '85:Very high quality'
-    )
-    _describe -t qualities 'gifski Quality' qualities && ret=0
-    ;;
-  input_source)
-    local -a expl
-    _tags video-files urls all-files
-    while _tags; do
-      if _requested video-files; then
-        _description video-files expl 'video file'
-        _files "$expl[@]" -g "*.(#i)(mp4|mkv|mov|webm|avi)(-.)" && ret=0
-      fi
-      if _requested urls; then
-        _description urls expl 'URL prefix'
-        compadd "$expl[@]" -S '' 'https://' 'http://' && ret=0
-      fi
-      if _requested all-files; then
-        _description all-files expl 'all files'
-        _files "$expl[@]" && ret=0
-      fi
-      ((ret == 0)) && break
-    done
-    ;;
+    fps)
+      local -a fps_list
+      fps_list=(
+        '8:Low framerate'
+        '10:Default framerate'
+        '12:Lightweight GIF'
+        '15:Smooth animation'
+        '24:Full motion'
+      )
+      _describe -t fps_list 'Frame Rate' fps_list && ret=0
+      ;;
+    width)
+      local -a widths
+      widths=(
+        '480:Standard sweet spot'
+        '640:High definition'
+        '720:Large (default)'
+        '1280:HD'
+      )
+      _describe -t widths 'Width (px)' widths && ret=0
+      ;;
+    quality)
+      local -a qualities
+      qualities=(
+        '60:Lower quality'
+        '70:Default sweet spot'
+        '80:High quality'
+        '85:Very high quality'
+      )
+      _describe -t qualities 'gifski Quality' qualities && ret=0
+      ;;
+    input_source)
+      local -a expl
+      _tags video-files urls all-files
+      while _tags; do
+        if _requested video-files; then
+          _description video-files expl 'video file'
+          _files "$expl[@]" -g "*.(#i)(mp4|mkv|mov|webm|avi)(-.)" && ret=0
+        fi
+        if _requested urls; then
+          _description urls expl 'URL prefix'
+          compadd "$expl[@]" -S '' 'https://' 'http://' && ret=0
+        fi
+        if _requested all-files; then
+          _description all-files expl 'all files'
+          _files "$expl[@]" && ret=0
+        fi
+        ((ret == 0)) && break
+      done
+      ;;
   esac
 
   return ret

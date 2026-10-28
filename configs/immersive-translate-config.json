@@ -78,10 +78,7 @@
   "openedNewFeaturesBlog": "6-months-of-upgrades-in-3-minutes",
   "pcFloatBall": {
     "afterInstalledAt": "2023-10-28",
-    "blockUrls": [
-      "*immersivetranslate.com/preview",
-      "*.immersivetranslate.com/download-subtitle*"
-    ],
+    "blockUrls": ["*immersivetranslate.com/preview", "*.immersivetranslate.com/download-subtitle*"],
     "clickType": "translate",
     "enable": false,
     "fixedPosition": "right",
@@ -213,9 +210,7 @@
         "name": "預設術語庫",
         "author": "self",
         "description": "預設常見術語庫，包含常見術語",
-        "matches": [
-          "*"
-        ],
+        "matches": ["*"],
         "glossaries": [
           {
             "k": "LLM",

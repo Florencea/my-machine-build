@@ -21,9 +21,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://18av.mm-cg.com/*"
-          ],
+          "orig_matches": ["https://18av.mm-cg.com/*"],
           "orig_noframes": null,
           "orig_run_at": "document-idle",
           "orig_run_in": [],
@@ -69,9 +67,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://www.wnacg.com/*"
-          ],
+          "orig_matches": ["https://www.wnacg.com/*"],
           "orig_noframes": null,
           "orig_run_at": "document-idle",
           "orig_run_in": [],
@@ -123,9 +119,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://*manhuaren.com/m*"
-          ],
+          "orig_matches": ["https://*manhuaren.com/m*"],
           "orig_noframes": null,
           "orig_run_at": "document-idle",
           "orig_run_in": [],
@@ -165,9 +159,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://exhentai.org/*"
-          ],
+          "orig_matches": ["https://exhentai.org/*"],
           "orig_noframes": null,
           "orig_run_at": "document-idle",
           "orig_run_in": [],
@@ -213,9 +205,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://9to5google.com/*"
-          ],
+          "orig_matches": ["https://9to5google.com/*"],
           "orig_noframes": null,
           "orig_run_at": "document-start",
           "orig_run_in": [],
@@ -310,9 +300,7 @@
           "orig_connects": [],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "https://nebula.zyxel.com/*"
-          ],
+          "orig_matches": ["https://nebula.zyxel.com/*"],
           "orig_noframes": null,
           "orig_run_at": "document-idle",
           "orig_run_in": [],
@@ -365,9 +353,7 @@
           ],
           "orig_excludes": [],
           "orig_includes": [],
-          "orig_matches": [
-            "*://*/*"
-          ],
+          "orig_matches": ["*://*/*"],
           "orig_noframes": null,
           "orig_run_at": "document-end",
           "orig_run_in": [],
@@ -612,9 +598,7 @@
         "reasons": {
           "en": "Used for a phishing compain to compromise users of baon-nutrition.com"
         },
-        "rules": [
-          "/https?:\\/\\/files\\.ulysse\\.travel\\/.*\\.user\\.js/"
-        ],
+        "rules": ["/https?:\\/\\/files\\.ulysse\\.travel\\/.*\\.user\\.js/"],
         "severity": 8
       }
     ],
