@@ -18,17 +18,65 @@ Write-Host '=== Starting Windows 11 Modern Dev Environment Setup ===' -Foregroun
 # 1. Dev Drive & Workspace Initialization
 $workspaceDir = 'E:\_Workspace'
 if (-not (Test-Path -LiteralPath $workspaceDir)) {
-    Write-Host "[1/8] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
+    Write-Host "[1/9] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
     New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
 }
 else {
-    Write-Host "[1/8] Workspace Directory verified: $workspaceDir" -ForegroundColor DarkGray
+    Write-Host "[1/9] Workspace Directory verified: $workspaceDir" -ForegroundColor DarkGray
 }
 
-# 2. Vite+ Home & Cache Relocation (E:\vite-plus)
+# 2. Internal Root CAs (Private PKI for *.internal)
+Write-Host '[2/9] Checking & Trusting Internal Root CAs...' -ForegroundColor Cyan
+
+$bhpdRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCRENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hRUkRFZU1Cd0dBMVVFQXd3VlFraFFSQ0JKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU1qRXdPVm9YRFRNMk1Ea3hOakUxTWpFd09Wb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJVUVReEhqQWNCZ05WQkFNTUZVSklVRVFnU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQk95elJsUngvMGR6SjBScDlkYTFiQmdCSmxMbFpqU0NmcFN6ZjBMcQpaeWRjeFo0c1NmWENuTyt4MUhZU1JEa3Y0RGlnYVZwckhaUE1OYldjQ1FsRnBsK2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZBZitMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQjhHQTFVZEl3UVlNQmFBRkFmKwpMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBjQU1FUUNJRmxqSXZKenIyWHJ5Y0FvYzgybVpjU2J3QzRPa1h3NExkQ3IKcU13SlpDWkRBaUJub2xGWjdLRUhtZWlUOU5xYUpmSEtSeW5rMzAwUDhSaDd1eDl2cWZIemNRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
+$bhgsRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCVENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hIVXpFZU1Cd0dBMVVFQXd3VlFraEhVeUJKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU5UUTBNbG9YRFRNMk1Ea3hOakUxTlRRME1sb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJUjFNeEhqQWNCZ05WQkFNTUZVSklSMU1nU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkZGOVk0d0N5TVNnbzNJSjU2QnZOaE12Mnh2a2Y4MC9id2dCOGhILwpFZHhzUktYTS91YjhBWTlldmxaR0VzQlpUZzJaS0ZIT0dMajBpNngyWldUanA3T2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZHMGU4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQjhHQTFVZEl3UVlNQmFBRkcwZQo4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBnQU1FVUNJUUNmd0JISXNaTVdHWUZEbVNFNHVuQlNlUUZidkZLMzU0NHUKQ1hadVYwRlhTd0lnR0hwRDVWMGN4RmluS2VtenJVMU1ZQklpZXB0SnVEVmFQSnVhK2Qya3JHST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
+
+function Install-InternalRootCA {
+    param(
+        [string]$Name,
+        [string]$Base64Cert
+    )
+    $rawCert = [System.Convert]::FromBase64String($Base64Cert)
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 (, $rawCert)
+    $thumbprint = $cert.Thumbprint
+
+    $inUser = @(Get-ChildItem Cert:\CurrentUser\Root -ErrorAction SilentlyContinue | Where-Object { $_.Thumbprint -eq $thumbprint })
+    $inMachine = @(Get-ChildItem Cert:\LocalMachine\Root -ErrorAction SilentlyContinue | Where-Object { $_.Thumbprint -eq $thumbprint })
+    if ($inUser.Count -gt 0 -or $inMachine.Count -gt 0) {
+        Write-Host "      [OK] $Name is already trusted." -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Host "      [+] Trusting $Name ($thumbprint)..." -ForegroundColor Green
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+    if ($isAdmin) {
+        $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
+    }
+    else {
+        $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+    }
+
+    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', $storeLocation)
+    try {
+        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+        $store.Add($cert)
+    }
+    finally {
+        $store.Close()
+    }
+}
+
+Install-InternalRootCA -Name 'BHPD Internal Root CA' -Base64Cert $bhpdRootCaB64
+Install-InternalRootCA -Name 'BHGS Internal Root CA' -Base64Cert $bhgsRootCaB64
+
+# 3. Vite+ Home & Cache Relocation (E:\vite-plus)
 $vpHome = 'E:\vite-plus'
 if ([Environment]::GetEnvironmentVariable('VP_HOME', 'User') -ne $vpHome) {
-    Write-Host "[2/8] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
+    Write-Host "[3/9] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
     [Environment]::SetEnvironmentVariable('VP_HOME', $vpHome, 'User')
     $env:VP_HOME = $vpHome
 }
@@ -43,10 +91,10 @@ if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
     }
 }
 else {
-    Write-Host '[2/8] Vite+ toolchain is ready.' -ForegroundColor DarkGray
+    Write-Host '[3/9] Vite+ toolchain is ready.' -ForegroundColor DarkGray
 }
 
-# 3. Idempotent Winget Package Installation
+# 4. Idempotent Winget Package Installation
 function Install-WingetIdempotent {
     param([string]$Id, [string]$Name)
     if ($Id -eq 'AgileBits.1Password') {
@@ -66,7 +114,7 @@ function Install-WingetIdempotent {
     }
 }
 
-Write-Host '[3/8] Checking & Installing Modern CLI Tools and Desktop Apps...' -ForegroundColor Cyan
+Write-Host '[4/9] Checking & Installing Modern CLI Tools and Desktop Apps...' -ForegroundColor Cyan
 
 $cliPackages = @(
     @{ Id = 'Microsoft.PowerShell'; Name = 'PowerShell 7' },
@@ -111,8 +159,8 @@ foreach ($pkg in $desktopPackages) {
 
 & winget pin add --id Microsoft.Edge --blocking 2>$null | Out-Null
 
-# 4. Global Git Configuration & Pre-Commit Safety Hook
-Write-Host '[4/8] Configuring Global Git Settings & Pre-Commit Hook...' -ForegroundColor Cyan
+# 5. Global Git Configuration & Pre-Commit Safety Hook
+Write-Host '[5/9] Configuring Global Git Settings & Pre-Commit Hook...' -ForegroundColor Cyan
 $scriptDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent $scriptDir
 
@@ -148,8 +196,8 @@ if (Test-Path -LiteralPath $srcPreCommit) {
     & git config --global core.hooksPath ($gitHooksDir -replace '\\', '/')
 }
 
-# 5. Windows Terminal & VS Code Configuration
-Write-Host '[5/8] Configuring Terminal Defaults to PowerShell 7...' -ForegroundColor Cyan
+# 6. Windows Terminal & VS Code Configuration
+Write-Host '[6/9] Configuring Terminal Defaults to PowerShell 7...' -ForegroundColor Cyan
 $wtSettings = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
 if (Test-Path -LiteralPath $wtSettings) {
     try {
@@ -179,8 +227,8 @@ if (Test-Path -LiteralPath $codeSettings) {
     }
 }
 
-# 6. PowerShell 7 Profile Setup ($PROFILE)
-Write-Host "[6/8] Setting up PowerShell 7 `$PROFILE..." -ForegroundColor Cyan
+# 7. PowerShell 7 Profile Setup ($PROFILE)
+Write-Host "[7/9] Setting up PowerShell 7 `$PROFILE..." -ForegroundColor Cyan
 $ps7Dir = Join-Path $HOME 'Documents\PowerShell'
 if (-not (Test-Path -LiteralPath $ps7Dir)) {
     New-Item -ItemType Directory -Force -Path $ps7Dir | Out-Null
@@ -199,8 +247,8 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 '@
 [System.IO.File]::WriteAllText($profilePath, $profileContent, $utf8NoBom)
 
-# 7. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
-Write-Host '[7/8] Syncing Antigravity Plugins...' -ForegroundColor Cyan
+# 8. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
+Write-Host '[8/9] Syncing Antigravity Plugins...' -ForegroundColor Cyan
 $pluginsDestRoot = Join-Path $HOME '.gemini\config\plugins'
 if (-not (Test-Path -LiteralPath $pluginsDestRoot)) {
     New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
@@ -226,8 +274,8 @@ foreach ($legacyDir in @('rules', 'skills')) {
     }
 }
 
-# 8. Register Repository CLI Directory & Prune Stale User PATH
-Write-Host '[8/8] Registering CLI Directory and Pruning Stale User PATH Entries...' -ForegroundColor Cyan
+# 9. Register Repository CLI Directory & Prune Stale User PATH
+Write-Host '[9/9] Registering CLI Directory and Pruning Stale User PATH Entries...' -ForegroundColor Cyan
 $cliDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir '..\cli')).Path
 $rawUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $currentUserPath = @()
