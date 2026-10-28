@@ -41,7 +41,7 @@
   "isEnableNotification": false,
   "isShowContextMenu": false,
   "loadingTheme": "none",
-  "localUpdatedAt": "2026-08-17T16:04:54.057Z",
+  "localUpdatedAt": "2026-10-28T15:02:08.679Z",
   "modifiedBySystem": true,
   "monkeyH5FloatBall": {
     "afterInstalledAt": "",
@@ -78,7 +78,10 @@
   "openedNewFeaturesBlog": "6-months-of-upgrades-in-3-minutes",
   "pcFloatBall": {
     "afterInstalledAt": "2023-10-28",
-    "blockUrls": ["*immersivetranslate.com/preview", "*.immersivetranslate.com/download-subtitle*"],
+    "blockUrls": [
+      "*immersivetranslate.com/preview",
+      "*.immersivetranslate.com/download-subtitle*"
+    ],
     "clickType": "translate",
     "enable": false,
     "fixedPosition": "right",
@@ -91,6 +94,7 @@
     "upgradeShowLimit": 50,
     "upgradeVisible": true
   },
+  "popupMode": "simple",
   "sameLangCheck": false,
   "sameLangTranslationTheme": "none",
   "sensitiveConfig": {
@@ -100,6 +104,13 @@
     "toggleTranslateTheWholePage": "Alt+W",
     "translateInputBox": "Alt+I"
   },
+  "simpleModeDisabledFeatures": [
+    "selection",
+    "writing",
+    "hover",
+    "input",
+    "subtitle"
+  ],
   "subtitleTranslateService": "inherit",
   "targetLanguage": "zh-TW",
   "translationMode": "translation",
@@ -197,20 +208,22 @@
       "blog.cloudflare.com"
     ]
   },
-  "updatedAt": "2026-08-17T16:04:54.057Z",
+  "updatedAt": "2026-10-28T15:02:08.679Z",
   "userTranslationServices": {
     "translationService": "google-free"
   },
   "terms": {
     "version": 1,
-    "exportedAt": "2026-09-29T14:03:14.981Z",
+    "exportedAt": "2026-10-28T15:02:22.697Z",
     "data": [
       {
         "id": "default",
         "name": "預設術語庫",
         "author": "self",
         "description": "預設常見術語庫，包含常見術語",
-        "matches": ["*"],
+        "matches": [
+          "*"
+        ],
         "glossaries": [
           {
             "k": "LLM",
