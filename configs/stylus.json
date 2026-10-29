@@ -139,7 +139,7 @@
     "name": "ubo style desktop",
     "sections": [
       {
-        "code": ":root {\n    --stylus-bg-dark: #292929;\n    --stylus-bg-light: #fff;\n    --stylus-text-dark: #fff;\n    --stylus-text-light: #000;\n    --stylus-bg-input-dark: #383838;\n    --stylus-bg-input-light: #e0e0e0;\n    --stylus-font-sans-serif: system-ui, sans-serif;\n    --stylus-font-monospace: ui-monospace, monospace;\n}\n* {\n    text-rendering: auto !important;\n    font-kerning: normal !important;\n    font-variant-ligatures: common-ligatures !important;\n    -webkit-font-smoothing: auto !important;\n}\n"
+        "code": ":root {\n    --stylus-bg-dark: #292929;\n    --stylus-bg-light: #fff;\n    --stylus-text-dark: #fff;\n    --stylus-text-light: #000;\n    --stylus-bg-input-dark: #383838;\n    --stylus-bg-input-light: #e0e0e0;\n    --stylus-font-sans-serif: sans-serif;\n    --stylus-font-monospace: monospace;\n}\n* {\n    text-rendering: auto !important;\n    font-kerning: normal !important;\n    font-variant-ligatures: common-ligatures !important;\n    -webkit-font-smoothing: auto !important;\n}\n"
       },
       {
         "code": ".header_pop,\n.ad_pop,\n#app_banner{\n    display: none !important;\n}\nbody {\n    font-family: var(--stylus-font-sans-serif) !important;\n}\n.page-content.with-app-banner #content{\n    padding-top: 70px !important;\n}\n.page-content.with-app-banner #header_v2{\n    top: 0 !important;\n}",
@@ -245,6 +245,12 @@
         ]
       },
       {
+        "code": ".fui-FluentProviderr0 {\n    --fontFamilyBase: sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, \"Apple Color Emoji\", \"Segoe UI Emoji\";\n    --fontFamilyMonospace: monospace, 'Cascadia Mono', Consolas, ui-monospace, Menlo, Monaco;\n}",
+        "domains": [
+          "teams.live.com"
+        ]
+      },
+      {
         "code": ".nav-header-holder > :not(.site-logo),\n.float-top,\ndiv[class^=ad],\ndiv[id*=crazy_ad],\n#sidebar,\n.headline,\n.article > :not(.content):not(.header):not(.article-wrapper),\n#topShare,\ndiv:has(> .google-dfp):not(.main-content),\n.newsletter2in1 {\n    display: none !important;\n}\n\n.main-content,\n.inner-content,\n.post-main {\n    width: 100% !important;\n    float: none !important;\n}\n.inner-content {\n    padding-top: 1rem !important\n}\n.small-articles ul li {\n    max-width: calc( 50% - 5px) !important;\n}\n.article-large,\n.article-large img {\n    width: 100% !important;\n}\n.post-main {\n    display: flex !important;\n    justify-content: center !important;\n    padding-top: 2rem !important;\n}\n.post-main > .article {\n    max-width: 796px !important;\n}\n.article > .content > h2,\nlabel.caption {\n    border: 0 !important;\n}\nbody {\n    font-family: var(--stylus-font-sans-serif) !important;\n}",
         "domains": [
           "techbang.com"
@@ -269,9 +275,9 @@
         ]
       }
     ],
-    "updateDate": 1793198702696,
+    "updateDate": 1793243967958,
     "_id": "01ce6566-808b-454e-a10c-6a91f3ec5ff0",
-    "_rev": 1793198702696,
+    "_rev": 1793243967958,
     "id": 1
   },
   {
