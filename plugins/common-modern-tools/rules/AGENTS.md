@@ -21,9 +21,10 @@
   - CI workflow validation: `actionlint` locally before staging `.github/workflows/*.yml`
   - Benchmarking: `hyperfine '<cmd>'` instead of ad-hoc time commands
   - Unified Node.js & Frontend Toolchain: `vp`, `vpx <tool>` (e.g., `vpx oxfmt`, `vpx oxlint`), `vpr <script>`
-- **Zero Throwaway Script Policy (No Scratch File Pollution)**:
+- **Zero Throwaway Script Policy & In-Memory Execution Safety**:
   - NEVER generate ephemeral script files (e.g. `temp.py`, `scratch.js`, `test.ps1`, `query.sh`) on disk for basic data transformations, string parsing, or multi-command glue tasks.
-  - Execute multi-command automation strictly in-memory via `pwsh -NoLogo -NoProfile -Command '...'` or direct CLI pipes.
+  - Execute multi-command automation strictly in-memory via `pwsh -NoLogo -NoProfile -Command '...'` (or `-EncodedCommand` for complex multi-line logic) or direct CLI pipes.
+  - **Windows Double-Shell Safety Invariant**: In Windows environments where the host tool runner is Windows PowerShell 5.1, multi-command in-memory `pwsh` scripts MUST strictly follow `win11-modern-tools` rules: declare `$ErrorActionPreference = 'Stop'`, enforce defensive path assertions, and prevent outer shell quote-stripping.
   - Reserve Python strictly for project-native workflows or tasks requiring specialized external dependencies (e.g. pandas, torch, AST parsers).
 
 ---
