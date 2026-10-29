@@ -17,3 +17,18 @@ Standards for maintaining and updating GitHub Actions workflows.
 
 - **Offline-Only Tool**: `actionlint` is strictly an offline / local shift-left verification guardrail.
 - **Remote Workflow Invariant**: Never embed `actionlint` steps into remote GitHub Actions workflow files (`.github/workflows/*.yml`).
+
+## 3. GitHub Actions Runner Best Practices & Invariants
+
+- **Major Floating Tags Invariant**:
+  - Always reference GitHub Actions using their authoritative Major floating tag:
+    - `actions/checkout@v7`
+    - `voidzero-dev/setup-vp@v1`
+    - `actions/cache@v6`
+    - `actions/upload-artifact@v7`
+  - Strictly avoid locking actions to granular minor or patch releases (e.g. never `@v1.21.2` or `@v4`). Major floating tags guarantee immediate inheritance of security fixes, runtime improvements, and non-breaking bug fixes.
+- **Concurrency Policy**: Workflows triggered by `push` and `pull_request` must declare top-level `concurrency` with `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` to prevent redundant CI runs and runner starvation.
+- **Timeout Protection**: Every runner job must declare an explicit `timeout-minutes: 15` to prevent stalled tests or deadlocked processes from consuming the default quota.
+- **Architecture-Aware Caching**: Cache keys for toolchain tasks (e.g. Vite Task Cache) must incorporate `${{ runner.os }}-${{ runner.arch }}` to ensure complete cache isolation between x64 and ARM64 runners.
+- **Artifact Retention**: Failure diagnostic uploads via `actions/upload-artifact@v7` must specify `retention-days: 7` and `if-no-files-found: ignore`.
+- **Node.js Runtime Invariant**: Node.js 26 is the project's authoritative Active LTS engine (`package.json` `engines.node`).

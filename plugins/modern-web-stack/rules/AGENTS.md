@@ -39,18 +39,39 @@
   - Unit Testing: `node:test` and `node:assert/strict` for standalone Node scripts
 - **Process & Execution Safety**: Prefer `execFileSync` or `spawnSync` with argument arrays and `shell: false`. Signal failure via `process.exitCode = 1` rather than abrupt `process.exit(1)`.
 
-### 1.4 Unified Vite+ Toolchain & Agent-Friendly Formats
+### 1.4 Unified Vite+ Toolchain & Task Caching
 
 - **Unified Vite+ Mandate**: ALWAYS use Vite+ commands across all workflows (`vp`, `vpx`, `vpr`). STRICTLY FORBIDDEN to use package-manager specific runners (`npx`, `pnpm dlx`, `bunx`, `npm run`).
   - Project scripts $\rightarrow$ `vpr <script>` (or `vp run <script>`)
   - One-off tools $\rightarrow$ `vpx <tool>` (e.g. `vpx oxlint`, `vpx oxfmt`)
   - Dependencies $\rightarrow$ `vp install`, `vp update`, `vp add`, `vp remove`
   - Managed Node execution $\rightarrow$ `vp node <script>`
+- **Vite Task Caching & Acceleration**:
+  - Configure `run.cache: { scripts: true, tasks: true }` in `vite.config.ts`.
+  - Unmodified script tasks replay in milliseconds, drastically speeding up inner verification loops.
+  - Inspection: Use `vpr --last-details` to inspect task cache hit/miss details.
+  - Invalidation: Use `vp cache clean` or pass `--no-cache` (`vpr --no-cache`) to force fresh execution.
 - **Agent-Friendly Formats**:
   - Installed packages: `vp list --json`
   - Outdated dependencies: `vp outdated --format json`
   - Toolchain status: `vp toolchain --json`
   - Test runner: `vp test run --reporter=tap-flat --no-color` (or `vp test run --json`)
+
+### 1.5 Cross-Platform File Paths & Filesystem Hygiene
+
+- **Path Concatenation via `node:path`**:
+  - NEVER concatenate paths manually using string interpolation (`dir + '/' + file` or `dir + '\\' + file`).
+  - ALWAYS use `node:path` (`path.join`, `path.resolve`, `path.relative`) or `node:url` `fileURLToPath(import.meta.url)`.
+- **POSIX Forward Slashes in Glob Patterns**:
+  - In all file glob patterns (`node:fs/promises` `glob`, `fast-glob`, `knip.json`, Vite `ignorePatterns`), ALWAYS use POSIX forward slashes `/`. Windows backslashes `\` are escape characters in glob syntax and break file discovery.
+- **Linux CI Case-Sensitivity Defense**:
+  - Windows (NTFS/ReFS) and macOS (APFS) filesystems are case-insensitive by default; Linux CI runners (`ubuntu-latest`) are strictly case-sensitive.
+  - Import specifiers MUST match exact on-disk casing (`import { Button } from "./Button"` only if the file is named `Button.tsx`).
+- **Line Ending & Multiline Assertion Hygiene**:
+  - Windows checkouts may convert line endings to CRLF (`\r\n`).
+  - Multiline string comparisons, snapshot assertions, and markdown parsing must normalize line endings (`str.replace(/\r\n/g, '\n')`) or account for `\r?\n` regex patterns.
+- **Subshell Stdin Safety**:
+  - When running background CLI commands on Windows, background subshells pipe standard input. Never invoke commands that wait indefinitely for stdin without explicit targets or non-interactive flags.
 
 ---
 
@@ -82,7 +103,7 @@
 - **Safe Template Literals**: Only interpolate primitive types (`string`, `number`, `boolean`). Explicitly convert complex types via `String(val)` or `JSON.stringify(val)`.
 - **Async & Null Safety**: Handle all promises (`await`, `return`, or `void`); always prefer `??` over `||`.
 - **Consistent Type Imports**: Enforce `import type { ... }` for type-only imports (`verbatimModuleSyntax`).
-- **All-in-One `vite.config.ts`**: Configure Oxlint and Oxfmt rules directly inside `vite.config.ts` (`lint` and `fmt` fields) with `lint.options.typeAware: true` and `lint.options.typeCheck: true`.
+- **All-in-One `vite.config.ts`**: Configure Oxlint and Oxfmt rules directly inside `vite.config.ts` (`lint` and `fmt` fields) with `lint.options.typeAware: true` and `lint.options.typeCheck: true`. Integrate `@shadcn/lint` to govern UI component styling.
 
 ---
 
@@ -109,9 +130,13 @@ When no external system is involved, **NEVER use an Effect**:
 - **Server Actions & Forms**: Prefer `<form action={serverAction}>` paired with `useActionState`, `useFormStatus`, and `useOptimistic`.
 - **React Compiler**: When `@vitejs/plugin-react` has `compiler: true`, avoid manual `useMemo`/`useCallback`/`React.memo` boilerplate.
 
-### 3.3 Tailwind CSS v4 & TanStack Router Rules
+### 3.3 Tailwind CSS v4, `@shadcn/lint` & TanStack Router Rules
 
 - **Design Token SSOT (`@theme`)**: Define tokens in root CSS via `@import "tailwindcss";` and `@theme { ... }`. Bridge UI libraries via CSS variables; never hardcode magic colors or use inline `style={{ ... }}`.
+- **Design System Governance (`@shadcn/lint`)**:
+  - Strictly enforce `shadcn/no-raw-colors`, `shadcn/no-arbitrary-values`, and `shadcn/no-inline-styles`.
+  - Follow component contracts: External page code may only pass layout utilities (`allow: ["layout"]`) or variant props. Never restyle internal component borders or typography from outside.
+  - Exclude primitive UI files (`src/components/ui/**`) from `shadcn/no-restyle` via `lint.overrides`.
 - **Canonical Classes & Safe Merging**: Maintain zero warnings on `vpr lint:tailwind`. Never dynamically interpolate class names (`bg-blue-${shade}`). Merge conditional classes using `clsx` and `tailwind-merge` (`cn(...)`).
 - **TanStack Router**: Place route modules under `src/routes/`. NEVER manually edit `src/routeTree.gen.ts`. Validate search parameters using `validateSearch` paired with Zod schemas.
 
@@ -127,8 +152,32 @@ When no external system is involved, **NEVER use an Effect**:
   2. **Tier 2 (`agent:verify:unit`)**: `vpr agent:verify:inner && vpr agent:test:unit`.
   3. **Tier 3 (`agent:verify:gate` / `vpr verify`)**: Full gate (`unit` + `build` + `e2e` + `knip` deadcode).
 
-### 4.2 GitHub Actions CI & `actionlint` Shift-Left Mandate
+### 4.2 GitHub Actions CI & Runner Governance Mandate
 
-- **Mandatory Local `actionlint`**: Whenever `.github/workflows/` files are created or modified, agents MUST run `actionlint` locally before staging (`git add`) and pass with **0 errors and 0 warnings**.
-- **Offline Guardrail Invariant**: NEVER embed `actionlint` steps or jobs into remote GitHub Actions YAML workflow files.
+- **Major Floating Tags Invariant**:
+  - Always reference GitHub Actions using their authoritative Major floating tag:
+    - `actions/checkout@v7`
+    - `voidzero-dev/setup-vp@v1`
+    - `actions/cache@v6`
+    - `actions/upload-artifact@v7`
+  - Strictly avoid locking actions to granular minor or patch releases (e.g. never `@v1.21.2` or `@v4`). Major floating tags guarantee immediate inheritance of security fixes, runtime improvements, and non-breaking bug fixes.
+- **Top-Level Concurrency Policy**:
+  - Workflows triggered by `push` and `pull_request` must declare top-level `concurrency`:
+    ```yaml
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+    ```
+- **Job Timeout Protection**:
+  - Every runner job must declare an explicit `timeout-minutes: 15` to prevent stalled tests or deadlocked child processes from consuming the default 360-minute quota.
+- **Architecture-Aware Caching Key**:
+  - Cache keys for toolchain tasks (Vite Task Cache) must incorporate `${{ runner.os }}-${{ runner.arch }}`:
+    ```yaml
+    key: ${{ runner.os }}-${{ runner.arch }}-vite-task-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+    ```
+- **Artifact Retention**:
+  - Failure diagnostic uploads via `actions/upload-artifact@v7` must declare `retention-days: 7` and `if-no-files-found: ignore`.
+- **Mandatory Local `actionlint`**:
+  - Whenever `.github/workflows/` files are created or modified, agents MUST run `actionlint` locally before staging (`git add`) and pass with **0 errors and 0 warnings**.
+  - **Offline Guardrail Invariant**: NEVER embed `actionlint` steps or jobs into remote GitHub Actions YAML workflow files.
 - **Standard Vite+ CI Pipeline**: Use `voidzero-dev/setup-vp@v1` with `node-version-file: package.json` and `cache: true`, cache `node_modules/.vite/task-cache` and Playwright browsers, and run verification steps in deterministic topological order (`vp install` $\rightarrow$ `vpr typecheck` $\rightarrow$ `vp check` $\rightarrow$ `vpr agent:test:unit` $\rightarrow$ `vp build` $\rightarrow$ `vpr agent:test:e2e`).

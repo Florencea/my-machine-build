@@ -9,6 +9,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 
@@ -25,6 +29,7 @@ jobs:
   gatekeeper:
     name: Gatekeeper (Linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -42,10 +47,10 @@ jobs:
         uses: actions/cache@v6
         with:
           path: node_modules/.vite/task-cache
-          key: ${{ runner.os }}-vite-task-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: ${{ runner.os }}-${{ runner.arch }}-vite-task-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vite-task-cache-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-vite-task-cache-
+            ${{ runner.os }}-${{ runner.arch }}-vite-task-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-${{ runner.arch }}-vite-task-cache-
 
       - name: Get Playwright version
         id: playwright-version
@@ -80,3 +85,15 @@ jobs:
 
       - name: Run E2E browser tests
         run: vp run agent:test:e2e
+
+      - name: Upload Test Results Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-artifacts-${{ runner.os }}-${{ runner.arch }}
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            test-results/
+            playwright-report/
+            blob-report/

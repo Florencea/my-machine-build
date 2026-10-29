@@ -299,6 +299,21 @@ export function AntdProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
+### Design System Governance with `@shadcn/lint` & LSP
+
+Govern design token integrity and class hygiene across the codebase:
+
+- **`shadcn/no-raw-colors`**: Strictly forbids hardcoding hex/rgb values or unmapped color utilities. All palette colors must come from the `@theme` single source of truth.
+- **`shadcn/no-arbitrary-values`**: Bans arbitrary brackets (e.g. `w-[321px]`). Use standardized spacing scale tokens.
+- **`shadcn/no-inline-styles`**: Forbids `style={{ ... }}` attributes. Dynamic properties should bind CSS variables or variant props.
+- **`shadcn/no-restyle`**: Enforces strict component contracts:
+  - External page code may only pass layout and positioning utilities (e.g. `allow: ["layout"]` such as `w-full`, `mt-4`).
+  - Never override internal component borders, font weights, or colors from outside.
+  - Primitive UI files (`src/components/ui/**`) are exempted in `vite.config.ts` overrides.
+- **LSP Canonical Validation (`vpr lint:tailwind`)**:
+  - Run `vpr lint:tailwind` to check class compatibility via `@tailwindcss/language-server`.
+  - Run `vpr lint:tailwind:fix` to auto-sort and canonically format utility classes.
+
 ---
 
 ## 5. Authoritative Documentation Endpoints

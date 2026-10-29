@@ -126,3 +126,22 @@ for await (const entry of glob("src/**/*.ts")) {
   console.log("Found:", entry);
 }
 ```
+
+---
+
+## 5. Cross-Platform Scripting Standards
+
+Ensure Node.js utilities and automation scripts run identically across macOS and Windows 11:
+
+- **Path Normalization**:
+  - Always use `node:path` methods (`path.join`, `path.resolve`, `path.relative`) rather than raw string concatenation.
+  - Convert file URLs using `fileURLToPath(import.meta.url)`.
+- **POSIX Slashes in Glob Patterns**:
+  - Always pass POSIX forward slashes `/` to glob APIs (`node:fs/promises` `glob`, `fast-glob`, etc.).
+  - If a path was constructed via `path.join` on Windows, normalize it before globbing: `pattern.replace(/\\/g, "/")`.
+- **Process Safety & Argument Arrays**:
+  - Avoid `child_process.exec()` with string concatenation, which suffers from quoting differences between Windows `cmd`/`pwsh` and macOS `zsh`.
+  - Always prefer `execFileSync` or `spawnSync` with an array of arguments and `{ shell: false }`.
+- **Headless & Subshell Stdin Safety**:
+  - Default non-interactive CLI modes in scripts (`--no-color` / `NO_COLOR=1`).
+  - Never prompt for stdin in headless automation scripts, as background subshells on Windows pipe stdin and will hang indefinitely.

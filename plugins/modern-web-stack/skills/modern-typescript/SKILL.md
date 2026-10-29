@@ -108,3 +108,51 @@ export default defineConfig({
   },
 });
 ```
+
+---
+
+## 5. Type-Safe Localization SSOT Pattern (i18n)
+
+Maintain complete parity across locale translations without manual key verification:
+
+### 5.1 Schema SSOT (`src/locales/schema.ts`)
+
+```ts
+import { z } from "zod";
+
+export const TranslationSchema = z.object({
+  common: z.object({
+    confirm: z.string(),
+    cancel: z.string(),
+    loading: z.string(),
+  }),
+  auth: z.object({
+    signIn: z.string(),
+    signOut: z.string(),
+    welcomeUser: z.string(), // "Welcome, {name}!"
+  }),
+});
+
+export type Translations = z.infer<typeof TranslationSchema>;
+```
+
+### 5.2 Strict Parity Implementation (`src/locales/en-US.ts` & `src/locales/zh-TW.ts`)
+
+```ts
+import type { Translations } from "./schema.ts";
+
+export const enUS: Translations = {
+  common: {
+    confirm: "Confirm",
+    cancel: "Cancel",
+    loading: "Loading...",
+  },
+  auth: {
+    signIn: "Sign In",
+    signOut: "Sign Out",
+    welcomeUser: "Welcome, {name}!",
+  },
+};
+```
+
+Any missing key or typo in `zh-TW.ts` or `en-US.ts` is caught immediately by the TypeScript compiler (`tsc --noEmit`).
