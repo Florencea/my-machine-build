@@ -245,7 +245,7 @@
         ]
       },
       {
-        "code": ".fui-FluentProviderr0 {\n    --fontFamilyBase: sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, \"Apple Color Emoji\", \"Segoe UI Emoji\";\n    --fontFamilyMonospace: monospace, 'Cascadia Mono', Consolas, ui-monospace, Menlo, Monaco;\n}",
+        "code": ".fui-FluentProviderr0 {\n    --fontFamilyBase: sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, \"Apple Color Emoji\", \"Segoe UI Emoji\" !important;\n    --fontFamilyMonospace: monospace, 'Cascadia Mono', Consolas, ui-monospace, Menlo, Monaco !important;\n}",
         "domains": [
           "teams.live.com"
         ]
@@ -275,9 +275,9 @@
         ]
       }
     ],
-    "updateDate": 1793243967958,
+    "updateDate": 1793244228085,
     "_id": "01ce6566-808b-454e-a10c-6a91f3ec5ff0",
-    "_rev": 1793243967958,
+    "_rev": 1793244228085,
     "id": 1
   },
   {
