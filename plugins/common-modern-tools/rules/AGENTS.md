@@ -102,3 +102,28 @@
   - Managed Node execution $\rightarrow$ `vp node <script>`
 - **Bare Command Invocation (No Path Prefixes)**:
   - All terminal commands executed by agents must strictly use bare command names (e.g. `git`, `vp`, `pwsh`, `node`, `rg`, `fd`, `shfmt`) relying on `$PATH`. Prefixing absolute paths breaks Antigravity allowlist matching.
+
+---
+
+## 8. Universal Cross-Platform Authoring & Execution Safety Invariants
+
+- **Path Concatenation & Resolution (Zero String Concatenation)**:
+  - NEVER concatenate filesystem paths using manual string addition (`dir + '/' + file` or `dir + '\\' + file`).
+  - In Node.js / TypeScript: ALWAYS use `node:path` methods (`path.join()`, `path.resolve()`, `path.relative()`).
+  - In PowerShell: ALWAYS use `Join-Path` or `[System.IO.Path]::Combine()`.
+  - In Zsh / Shell: ALWAYS use native parameter modifiers (`${dir}/${file}`, `${file:A}`) and avoid assuming fixed path formats.
+- **Glob Patterns POSIX Forward-Slash Invariant**:
+  - In all file glob patterns (`node:fs/promises` `glob`, `fast-glob`, `knip.json`, Vite `ignorePatterns`, `fd`), ALWAYS use POSIX forward slashes `/`.
+  - On Windows, backslashes `\` are interpreted as escape characters in glob syntax, causing file matching to fail silently or throw errors. If a path was produced by `path.join`, normalize it before globbing: `pattern.replace(/\\/g, '/')`.
+- **Line Ending & Multiline Assertion Hygiene**:
+  - All source, script, markdown, and config files must be committed with LF (`\n`) line endings and UTF-8 without BOM.
+  - Windows checkouts may convert files to CRLF (`\r\n`). When writing multiline string comparisons, snapshot assertions, or markdown parsing in tests, ALWAYS normalize line endings (`str.replace(/\r\n/g, '\n')`) or use `\r?\n` in regular expressions.
+- **Shell Portability (Zero OS-Specific Builtins in Shared Contexts)**:
+  - NEVER use POSIX-only shell builtins (`export VAR=val`, `source`, `rm -rf`, `cp -r`, `mkdir -p`, `cat`, `grep`, `sed`) or Windows-only CMD builtins (`set VAR=val`, `dir`, `del`, `type`, `cls`) inside shared scripts, tool configs, or `package.json` `"scripts"`.
+  - For task orchestration across operating systems, ALWAYS use Vite+ commands (`vp`, `vpx`, `vpr`), Node.js native ESM scripts (`node ./scripts/task.mjs`), or PowerShell 7 (`pwsh`).
+- **Universal Subshell Stdin Safety**:
+  - In background subshells on both macOS (Zsh) and Windows (PowerShell), standard input is piped.
+  - NEVER invoke interactive CLI utilities or commands that wait for stdin without target paths or piped streams (`rg`, `tokei`, `ast-grep`, `jq`, `yq`, `sd`, `xsv`). Always pass explicit targets: `rg -n -M 200 "pattern" .` or `tokei .`.
+- **Unicode Filename Normalization (NFC vs NFD)**:
+  - macOS APFS normalizes filenames to decomposed form (NFD), while Windows and Linux use precomposed form (NFC).
+  - When comparing or validating filenames containing non-ASCII, accented, or CJK characters, ALWAYS normalize paths via `str.normalize('NFC')`.

@@ -136,12 +136,29 @@ Ensure Node.js utilities and automation scripts run identically across macOS and
 - **Path Normalization**:
   - Always use `node:path` methods (`path.join`, `path.resolve`, `path.relative`) rather than raw string concatenation.
   - Convert file URLs using `fileURLToPath(import.meta.url)`.
+  - Use `import.meta.dirname` and `import.meta.filename` in ESM; use `node:os` `homedir()` instead of `~`.
 - **POSIX Slashes in Glob Patterns**:
   - Always pass POSIX forward slashes `/` to glob APIs (`node:fs/promises` `glob`, `fast-glob`, etc.).
   - If a path was constructed via `path.join` on Windows, normalize it before globbing: `pattern.replace(/\\/g, "/")`.
+- **Cross-Platform `package.json` Scripts**:
+  - Avoid shell-specific builtins (`rm -rf`, `export VAR=val`, `set VAR=val`):
+    ```json
+    {
+      "scripts": {
+        "build": "vite build --emptyOutDir",
+        "clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\""
+      }
+    }
+    ```
+- **Cross-Platform Environment Variable Loading**:
+  - Load environment variables without third-party CLI wrappers using Node.js built-in:
+    ```ts
+    // Node.js 20.6+ native env loader
+    process.loadEnvFile();
+    ```
 - **Process Safety & Argument Arrays**:
   - Avoid `child_process.exec()` with string concatenation, which suffers from quoting differences between Windows `cmd`/`pwsh` and macOS `zsh`.
   - Always prefer `execFileSync` or `spawnSync` with an array of arguments and `{ shell: false }`.
-- **Headless & Subshell Stdin Safety**:
+- **Headless & Universal Subshell Stdin Safety**:
   - Default non-interactive CLI modes in scripts (`--no-color` / `NO_COLOR=1`).
-  - Never prompt for stdin in headless automation scripts, as background subshells on Windows pipe stdin and will hang indefinitely.
+  - Never prompt for stdin in headless automation scripts, as background subshells on Windows and macOS pipe stdin and will hang indefinitely.

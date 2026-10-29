@@ -62,16 +62,20 @@
 - **Path Concatenation via `node:path`**:
   - NEVER concatenate paths manually using string interpolation (`dir + '/' + file` or `dir + '\\' + file`).
   - ALWAYS use `node:path` (`path.join`, `path.resolve`, `path.relative`) or `node:url` `fileURLToPath(import.meta.url)`.
+  - Use `import.meta.dirname` and `import.meta.filename` in pure ESM modules; never use `~` in filesystem paths (use `node:os` `homedir()`).
 - **POSIX Forward Slashes in Glob Patterns**:
   - In all file glob patterns (`node:fs/promises` `glob`, `fast-glob`, `knip.json`, Vite `ignorePatterns`), ALWAYS use POSIX forward slashes `/`. Windows backslashes `\` are escape characters in glob syntax and break file discovery.
 - **Linux CI Case-Sensitivity Defense**:
   - Windows (NTFS/ReFS) and macOS (APFS) filesystems are case-insensitive by default; Linux CI runners (`ubuntu-latest`) are strictly case-sensitive.
-  - Import specifiers MUST match exact on-disk casing (`import { Button } from "./Button"` only if the file is named `Button.tsx`).
+  - Import specifiers, dynamic imports, and asset paths MUST match exact on-disk casing (`import { Button } from "./Button"` only if the file is named `Button.tsx`).
+- **Cross-Platform `package.json` `"scripts"` (Zero Shell Builtins)**:
+  - NEVER use POSIX-only commands like `rm -rf dist` (fails on Windows CMD/PowerShell; use `vp build --emptyOutDir` or Node.js native `fs.rmSync`).
+  - NEVER use `export VAR=val &&` or `set VAR=val &&` in package scripts. Pass configuration via `.env` files, Vite+ native environment loading, or `process.loadEnvFile()`.
 - **Line Ending & Multiline Assertion Hygiene**:
   - Windows checkouts may convert line endings to CRLF (`\r\n`).
   - Multiline string comparisons, snapshot assertions, and markdown parsing must normalize line endings (`str.replace(/\r\n/g, '\n')`) or account for `\r?\n` regex patterns.
-- **Subshell Stdin Safety**:
-  - When running background CLI commands on Windows, background subshells pipe standard input. Never invoke commands that wait indefinitely for stdin without explicit targets or non-interactive flags.
+- **Universal Subshell Stdin Safety**:
+  - In background subshells on both Windows and macOS, background subshells pipe standard input. Never invoke commands that wait indefinitely for stdin without explicit targets or non-interactive flags (`rg -n -M 200 "pattern" .`, `tokei .`).
 
 ---
 

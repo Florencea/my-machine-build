@@ -12,8 +12,8 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
 
 - **`plugins/common-modern-tools/`** (Shared across macOS & Windows 11):
   - `plugin.json`: Manifest for universal cross-platform CLI toolchain bundle.
-  - `rules/AGENTS.md`: Universal CLI priorities, zero-throwaway script policy, live query mandate, token discipline, and git commit safety.
-  - `skills/common-toolchain/SKILL.md`: 4-tier tool selection hierarchy, progressive reconnaissance (L0-L4), custom CLI helpers (`cli/*.ps1`), and authoritative live doc matrix.
+  - `rules/AGENTS.md`: Universal CLI priorities, zero-throwaway script policy, live query mandate, token discipline, git commit safety, and cross-platform scripting invariants.
+  - `skills/common-toolchain/SKILL.md`: 4-tier tool selection hierarchy, progressive reconnaissance (L0-L4), custom CLI helpers (`cli/*.ps1`), authoritative live doc matrix, and cross-platform recipes.
 - **`plugins/macos-modern-tools/`** (macOS only):
   - `plugin.json`: Manifest for macOS platform bundle.
   - `rules/AGENTS.md`: macOS Darwin execution rules, subshell stdin defense, Zsh nomatch guardrails, APFS CoW cloning, BSD traps, and Darwin diagnostics.
