@@ -446,9 +446,9 @@ $cleanPath = ([Environment]::GetEnvironmentVariable("Path", "User") -split ';' |
 ### Microsoft Edge DNS over HTTPS on Domain-Managed PC
 
 ```powershell
-# Enable Edge DoH with Google Public DNS (HKCU - No Admin Required)
-$p = "HKCU:\Software\Policies\Microsoft\Edge"; if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null }; Set-ItemProperty -Path $p -Name "DnsOverHttpsMode" -Value "automatic" -Type String; Set-ItemProperty -Path $p -Name "DnsOverHttpsTemplates" -Value "https://dns.google/dns-query" -Type String
+# Enable Edge DoH with Google Public DNS (Run PowerShell as Administrator)
+$p = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"; if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null }; Set-ItemProperty -Path $p -Name "DnsOverHttpsMode" -Value "automatic" -Type String; Set-ItemProperty -Path $p -Name "DnsOverHttpsTemplates" -Value "https://dns.google/dns-query" -Type String
 
-# Revert to Default Managed Behavior
-$p = "HKCU:\Software\Policies\Microsoft\Edge"; if (Test-Path $p) { Remove-ItemProperty -Path $p -Name "DnsOverHttpsMode", "DnsOverHttpsTemplates" -ErrorAction SilentlyContinue }
+# Revert to Default Managed Behavior (Run PowerShell as Administrator)
+$p = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"; if (Test-Path $p) { Remove-ItemProperty -Path $p -Name "DnsOverHttpsMode", "DnsOverHttpsTemplates" -ErrorAction SilentlyContinue }
 ```
