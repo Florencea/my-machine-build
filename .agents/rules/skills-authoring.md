@@ -16,8 +16,8 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
   - `skills/common-toolchain/SKILL.md`: 4-tier tool selection hierarchy, progressive reconnaissance (L0-L4), custom CLI helpers (`cli/*.ps1`), and authoritative live doc matrix.
 - **`plugins/macos-modern-tools/`** (macOS only):
   - `plugin.json`: Manifest for macOS platform bundle.
-  - `rules/AGENTS.md`: macOS Darwin execution rules, BSD compatibility traps, idiomatic Zsh standards, and Apple defaults.
-  - `skills/macos-toolchain/SKILL.md`: macOS BSD workarounds, Darwin system automation (`defaults`, `PlistBuddy`), and Zsh recipes.
+  - `rules/AGENTS.md`: macOS Darwin execution rules, subshell stdin defense, Zsh nomatch guardrails, APFS CoW cloning, BSD traps, and Darwin diagnostics.
+  - `skills/macos-toolchain/SKILL.md`: Subshell stdin recipes, Zsh glob patterns, APFS cloning, BSD workarounds, Darwin system automation, and PowerShell 7 symlink resolution.
 - **`plugins/win11-modern-tools/`** (Windows 11 only):
   - `plugin.json`: Manifest for Windows 11 platform bundle.
   - `rules/AGENTS.md`: Windows 11 platform rules, subshell stdin protection, PowerShell 5.1 vs 7 isolation, and Dev Drive optimization.

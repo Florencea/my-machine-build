@@ -219,7 +219,7 @@ sync_plugin_dir "modern-web-stack"
 if [[ ! -d "$REPO_DIR/plugins" ]]; then
   fetch_file "plugins/common-modern-tools/skills/common-toolchain/SKILL.md" "$HOME/.gemini/config/plugins/common-modern-tools/skills/common-toolchain/SKILL.md"
   fetch_file "plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md" "$HOME/.gemini/config/plugins/macos-modern-tools/skills/macos-toolchain/SKILL.md"
-  local -a web_skills=(modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
+  local -a web_skills=(modern-hono-drizzle modern-nodejs modern-react-tailwind modern-typescript node-project-architecture tanstack-router)
   for skill in "${web_skills[@]}"; do
     fetch_file "plugins/modern-web-stack/skills/$skill/SKILL.md" "$HOME/.gemini/config/plugins/modern-web-stack/skills/$skill/SKILL.md"
   done

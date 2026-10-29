@@ -1,4 +1,4 @@
 {
   "name": "macos-modern-tools",
-  "description": "macOS Darwin platform execution rules, BSD compatibility guardrails, idiomatic Zsh standards, and Apple system defaults."
+  "description": "macOS Darwin platform execution rules, subshell stdin defense, Zsh glob nomatch guardrails, APFS Copy-on-Write cloning, BSD compatibility recipes, Apple system defaults, and Darwin diagnostics."
 }
