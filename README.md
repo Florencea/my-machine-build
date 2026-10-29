@@ -447,7 +447,7 @@ $cleanPath = ([Environment]::GetEnvironmentVariable("Path", "User") -split ';' |
 
 ```powershell
 # Enable Edge DoH with Google Public DNS (Run PowerShell as Administrator)
-$p = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"; if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null }; Set-ItemProperty -Path $p -Name "DnsOverHttpsMode" -Value "automatic" -Type String; Set-ItemProperty -Path $p -Name "DnsOverHttpsTemplates" -Value "https://dns.google/dns-query{?dns}" -Type String
+$p = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"; if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null }; Set-ItemProperty -Path $p -Name "DnsOverHttpsMode" -Value "secure" -Type String; Set-ItemProperty -Path $p -Name "DnsOverHttpsTemplates" -Value "https://dns.google/dns-query{?dns}" -Type String
 
 # Revert to Default Managed Behavior (Run PowerShell as Administrator)
 $p = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"; if (Test-Path $p) { Remove-ItemProperty -Path $p -Name "DnsOverHttpsMode", "DnsOverHttpsTemplates" -ErrorAction SilentlyContinue }
