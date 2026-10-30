@@ -394,6 +394,7 @@
     "news.ycombinator.com##html:style(--stylus-hn-cce-dark:#737373)",
     "news.ycombinator.com##html:style(--stylus-hn-cdd-dark:#5a5a5a)",
     "news.ycombinator.com##body:style(margin:0 !important)",
+    "news.ycombinator.com##body>center>table:not(#hnmain):style(background-color:light-dark(var(--stylus-bg-light),var(--stylus-bg-dark)) !important)",
     "news.ycombinator.com##td:matches-media((pointer:fine)):style(font-size:16px !important)",
     "news.ycombinator.com##td:matches-media((pointer:fine)):style(line-height:1.5em !important)",
     "news.ycombinator.com##.pagetop:matches-media((pointer:fine)):style(font-size:16px !important)",
