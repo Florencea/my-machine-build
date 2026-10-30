@@ -236,6 +236,8 @@ $profilePath = Join-Path $ps7Dir 'Microsoft.PowerShell_profile.ps1'
 $profileContent = @'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$env:COLORTERM = 'truecolor'
+$env:FORCE_COLOR = '3'
 if (Get-Module -ListAvailable -Name PSReadLine) {
     try {
         Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
