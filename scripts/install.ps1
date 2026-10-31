@@ -170,8 +170,8 @@ $repoRoot = Split-Path -Parent $scriptDir
 & git config --global core.longpaths true
 & git config --global core.autocrlf false
 & git config --global core.sshCommand 'C:/Windows/System32/OpenSSH/ssh.exe'
-& git config --global core.fsmonitor true
-& git config --global core.untrackedcache true
+& git config --global --unset-all core.fsmonitor 2>$null
+& git config --global --unset-all core.untrackedcache 2>$null
 & git config --global init.defaultBranch main
 & git config --global push.autoSetupRemote true
 & git config --global pull.rebase false
@@ -283,8 +283,8 @@ $currentUserPath = @()
 if ($rawUserPath) {
     $currentUserPath = @(
         $rawUserPath -split ';' |
-        ForEach-Object { $_.Trim().TrimEnd('\') } |
-        Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+            ForEach-Object { $_.Trim().TrimEnd('\') } |
+            Where-Object { $_ -and (Test-Path -LiteralPath $_) }
     )
 }
 
