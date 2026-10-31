@@ -6,9 +6,9 @@ set -euo pipefail
 sudo -v
 
 # 1. Touch ID for sudo via system template
-if [[ ! -f /etc/pam.d/sudo_local ]]; then
+if ! grep -Eq '^[[:space:]]*auth[[:space:]]+sufficient[[:space:]]+pam_tid\.so' /etc/pam.d/sudo_local 2>/dev/null; then
   if [[ -f /etc/pam.d/sudo_local.template ]]; then
-    sudo sh -c 'sed -e "s/^#auth/auth/" /etc/pam.d/sudo_local.template > /etc/pam.d/sudo_local'
+    sudo sh -c 'awk "{sub(/^#auth/, \"auth\"); print}" /etc/pam.d/sudo_local.template > /etc/pam.d/sudo_local'
   else
     sudo sh -c 'printf "# sudo_local: local authentication customization for sudo\nauth       sufficient     pam_tid.so\n" > /etc/pam.d/sudo_local'
   fi
@@ -87,8 +87,41 @@ defaults write -g NSDocumentSaveNewDocumentsToCloud -bool false
 defaults write kCFPreferencesAnyApplication TSMLanguageIndicatorEnabled -int 0
 defaults write com.apple.HIToolbox AppleCapsLockPressAndHoldToggleOff -int 1
 hidutil property --set '{"CapsLockDelayOverride":0}' >/dev/null 2>&1 || true
-sudo mkdir -p /Library/Preferences/FeatureFlags/Domain
-sudo defaults write /Library/Preferences/FeatureFlags/Domain/UIKit.plist redesigned_text_cursor -dict-add Enabled -bool false
+
+# Persist CapsLockDelayOverride=0 across reboots via LaunchAgent (idempotent)
+mkdir -p "$HOME/Library/LaunchAgents"
+KEY_REMAP_PLIST="$HOME/Library/LaunchAgents/com.local.KeyRemapping.plist"
+KEY_REMAP_CONTENT='<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.local.KeyRemapping</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/hidutil</string>
+    <string>property</string>
+    <string>--set</string>
+    <string>{"CapsLockDelayOverride":0}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>'
+
+if [[ ! -f "$KEY_REMAP_PLIST" ]] || [[ "$(<"$KEY_REMAP_PLIST")" != "$KEY_REMAP_CONTENT" ]]; then
+  printf '%s\n' "$KEY_REMAP_CONTENT" >"$KEY_REMAP_PLIST"
+  chmod 644 "$KEY_REMAP_PLIST"
+  launchctl bootout "gui/$(id -u)/com.local.KeyRemapping" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$KEY_REMAP_PLIST" 2>/dev/null || true
+elif ! launchctl print "gui/$(id -u)/com.local.KeyRemapping" >/dev/null 2>&1; then
+  launchctl bootstrap "gui/$(id -u)" "$KEY_REMAP_PLIST" 2>/dev/null || true
+fi
+
+if [[ "$(defaults read /Library/Preferences/FeatureFlags/Domain/UIKit.plist redesigned_text_cursor 2>/dev/null || true)" != *"Enabled = 0"* ]]; then
+  sudo mkdir -p /Library/Preferences/FeatureFlags/Domain
+  sudo defaults write /Library/Preferences/FeatureFlags/Domain/UIKit.plist redesigned_text_cursor -dict Enabled -bool false
+fi
 
 # Terminal configuration: prevent disk I/O freezes
 defaults write com.apple.Terminal ApplePersistenceIgnoreState -bool true
@@ -108,14 +141,15 @@ defaults write com.apple.frameworks.diskimages skip-verify-remote -bool true
 
 # 5. Disable Spotlight, Siri, and Background Intelligence safely & completely
 disable_spotlight_and_siri() {
-  # Turn off indexing globally
-  sudo mdutil -a -i off >/dev/null 2>&1 || true
-  sudo mdutil -a -E >/dev/null 2>&1 || true
+  # Turn off indexing globally (idempotent check)
+  if ! mdutil -s / 2>/dev/null | grep -q "Indexing disabled"; then
+    sudo mdutil -a -i off >/dev/null 2>&1 || true
+    sudo mdutil -a -E >/dev/null 2>&1 || true
+  fi
   sudo defaults write /Library/Preferences/com.apple.SpotlightServer.plist ExternalVolumesIndexed -bool false
 
-  # Place native markers to avoid indexing loops
-  sudo touch /.metadata_never_index 2>/dev/null || true
-  touch "$HOME/.metadata_never_index" 2>/dev/null || true
+  # Place native marker to avoid indexing loops
+  [[ -f "$HOME/.metadata_never_index" ]] || touch "$HOME/.metadata_never_index" 2>/dev/null || true
 
   # Disable Spotlight UI and Global Shortcuts
   /usr/libexec/PlistBuddy -c "Set :AppleSymbolicHotKeys:64:enabled false" ~/Library/Preferences/com.apple.symbolichotkeys.plist 2>/dev/null || true
@@ -187,7 +221,7 @@ git config --global core.hooksPath "$HOME/.config/git/hooks"
 fetch_file "configs/bash/bash_profile" "$HOME/.bash_profile"
 fetch_file "configs/bash/bashrc" "$HOME/.bashrc"
 
-touch "$HOME/.hushlogin"
+[[ -f "$HOME/.hushlogin" ]] || touch "$HOME/.hushlogin"
 mkdir -p "$HOME/.local/share/zsh/site-functions"
 mkdir -p "$HOME/.config/zsh/functions"
 fetch_file "configs/zsh/zshenv" "$HOME/.zshenv"
@@ -221,9 +255,11 @@ sync_plugin_dir() {
 
   mkdir -p "$dest_dir"
   if [[ -n "${REPO_DIR:-}" && -d "$src_dir" ]]; then
-    rm -rf "$dest_dir"
-    mkdir -p "$dest_dir"
-    cp -R "$src_dir/." "$dest_dir/"
+    if ! diff -qr "$src_dir" "$dest_dir" >/dev/null 2>&1; then
+      rm -rf "$dest_dir"
+      mkdir -p "$dest_dir"
+      cp -R -c "$src_dir/." "$dest_dir/"
+    fi
   else
     fetch_file "plugins/$plugin_name/plugin.json" "$dest_dir/plugin.json"
     fetch_file "plugins/$plugin_name/rules/AGENTS.md" "$dest_dir/rules/AGENTS.md"
@@ -269,7 +305,10 @@ if [[ -n "$CLI_DIR" ]]; then
   chmod +x "$CLI_DIR"/*.ps1(N)
   for script in "$CLI_DIR"/*.ps1(N); do
     cmd_name="${script:t:r}"
-    ln -sf "$script" "$HOME/.local/bin/$cmd_name"
+    link_path="$HOME/.local/bin/$cmd_name"
+    if [[ "$(readlink "$link_path" 2>/dev/null || true)" != "$script" ]]; then
+      ln -sf "$script" "$link_path"
+    fi
   done
 
   for link in "$HOME/.local/bin"/*(-@N); do
@@ -344,13 +383,15 @@ defaults write com.colliderli.iina horizontalScrollAction -int 2
 defaults write com.colliderli.iina verticalScrollAction -int 2
 defaults write com.colliderli.iina pinchAction -int 2
 
-# IINA toolbar buttons array using PlistBuddy for strict integer types
+# IINA toolbar buttons array using PlistBuddy for strict integer types (idempotent)
 IINA_PREF="$HOME/Library/Preferences/com.colliderli.iina.plist"
-/usr/libexec/PlistBuddy -c "Delete :controlBarToolbarButtons" "$IINA_PREF" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :controlBarToolbarButtons array" "$IINA_PREF" 2>/dev/null || true
-for btn_val in 2 1 5 0; do
-  /usr/libexec/PlistBuddy -c "Add :controlBarToolbarButtons: integer $btn_val" "$IINA_PREF" 2>/dev/null || true
-done
+if [[ "$(/usr/libexec/PlistBuddy -c "Print :controlBarToolbarButtons" "$IINA_PREF" 2>/dev/null | awk '/^[[:space:]]+[0-9]+$/ {printf "%s ", $1}')" != "2 1 5 0 " ]]; then
+  /usr/libexec/PlistBuddy -c "Delete :controlBarToolbarButtons" "$IINA_PREF" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :controlBarToolbarButtons array" "$IINA_PREF" 2>/dev/null || true
+  for btn_val in 2 1 5 0; do
+    /usr/libexec/PlistBuddy -c "Add :controlBarToolbarButtons: integer $btn_val" "$IINA_PREF" 2>/dev/null || true
+  done
+fi
 
 # Transmission configuration
 defaults write org.m0k.transmission BindPort -int 51247
@@ -364,8 +405,36 @@ defaults write org.m0k.transmission DisplayPeerProgressBarNumber -bool true
 defaults write org.m0k.transmission FilterSearchType -string "Name"
 defaults write org.m0k.transmission AutoSize -bool true
 
-# Register default file associations directly to LaunchServices (no UI confirmation dialogs)
+# Register default file associations directly to LaunchServices (idempotent, no UI confirmation dialogs)
 LS_SECURE_PLIST="$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+mkdir -p "${LS_SECURE_PLIST:h}"
+if ! /usr/libexec/PlistBuddy -c "Print :LSHandlers" "$LS_SECURE_PLIST" >/dev/null 2>&1; then
+  /usr/libexec/PlistBuddy -c "Add :LSHandlers array" "$LS_SECURE_PLIST" 2>/dev/null || true
+fi
+LS_HANDLERS_DUMP="$(/usr/libexec/PlistBuddy -c "Print :LSHandlers" "$LS_SECURE_PLIST" 2>/dev/null || true)"
+
+has_ls_uti() {
+  local uti="$1" role="$2"
+  awk -v uti="$uti" -v role="$role" '
+    /^    Dict \{/ { in_dict=1; has_uti=0; has_role=0 }
+    in_dict && $1 == "LSHandlerContentType" && $3 == uti { has_uti=1 }
+    in_dict && $1 == "LSHandlerRoleAll" && $3 == role { has_role=1 }
+    in_dict && /^    \}/ { if (has_uti && has_role) { found=1; exit 0 }; in_dict=0 }
+    END { exit !found }
+  ' <<<"$LS_HANDLERS_DUMP"
+}
+
+has_ls_ext() {
+  local ext="$1" role="$2"
+  awk -v ext="$ext" -v role="$role" '
+    /^    Dict \{/ { in_dict=1; has_ext=0; has_class=0; has_role=0 }
+    in_dict && $1 == "LSHandlerContentTag" && $3 == ext { has_ext=1 }
+    in_dict && $1 == "LSHandlerContentTagClass" && $3 == "public.filename-extension" { has_class=1 }
+    in_dict && $1 == "LSHandlerRoleAll" && $3 == role { has_role=1 }
+    in_dict && /^    \}/ { if (has_ext && has_class && has_role) { found=1; exit 0 }; in_dict=0 }
+    END { exit !found }
+  ' <<<"$LS_HANDLERS_DUMP"
+}
 
 # Keka default associations
 local -a keka_utis=(
@@ -385,17 +454,21 @@ local -a keka_utis=(
   "com.microsoft.cab"
 )
 for uti in "${keka_utis[@]}"; do
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentType string $uti" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.aone.keka" "$LS_SECURE_PLIST" 2>/dev/null || true
+  if ! has_ls_uti "$uti" "com.aone.keka"; then
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentType string $uti" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.aone.keka" "$LS_SECURE_PLIST" 2>/dev/null || true
+  fi
 done
 
 local -a keka_exts=(7z rar zip tar gz tgz bz2 tbz2 xz txz iso dmg)
 for ext in "${keka_exts[@]}"; do
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTag string $ext" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTagClass string public.filename-extension" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.aone.keka" "$LS_SECURE_PLIST" 2>/dev/null || true
+  if ! has_ls_ext "$ext" "com.aone.keka"; then
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTag string $ext" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTagClass string public.filename-extension" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.aone.keka" "$LS_SECURE_PLIST" 2>/dev/null || true
+  fi
 done
 
 # IINA default associations
@@ -422,17 +495,21 @@ local -a iina_utis=(
   "public.m3u-playlist"
 )
 for uti in "${iina_utis[@]}"; do
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentType string $uti" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.colliderli.iina" "$LS_SECURE_PLIST" 2>/dev/null || true
+  if ! has_ls_uti "$uti" "com.colliderli.iina"; then
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentType string $uti" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.colliderli.iina" "$LS_SECURE_PLIST" 2>/dev/null || true
+  fi
 done
 
 local -a iina_exts=(mkv flv webm wmv rmvb vob mov ts m4v avi mp4 mp3 flac wav aac ogg ape opus)
 for ext in "${iina_exts[@]}"; do
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTag string $ext" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTagClass string public.filename-extension" "$LS_SECURE_PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.colliderli.iina" "$LS_SECURE_PLIST" 2>/dev/null || true
+  if ! has_ls_ext "$ext" "com.colliderli.iina"; then
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0 dict" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTag string $ext" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerContentTagClass string public.filename-extension" "$LS_SECURE_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSHandlers:0:LSHandlerRoleAll string com.colliderli.iina" "$LS_SECURE_PLIST" 2>/dev/null || true
+  fi
 done
 
 # CLI tools
