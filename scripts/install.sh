@@ -69,8 +69,26 @@ export HOMEBREW_CURL_RETRIES=3
 
 # 4. System Performance & Native Defaults
 defaults write -g ApplePressAndHoldEnabled -bool false
+defaults write -g InitialKeyRepeat -int 12
+defaults write -g KeyRepeat -int 1
+defaults write -g NSAutomaticCapitalizationEnabled -bool false
+defaults write -g NSAutomaticDashSubstitutionEnabled -bool false
+defaults write -g NSAutomaticInlinePredictionEnabled -bool false
+defaults write -g NSAutomaticPeriodSubstitutionEnabled -bool false
+defaults write -g NSAutomaticQuoteSubstitutionEnabled -bool false
+defaults write -g NSAutomaticSpellingCorrectionEnabled -bool false
+defaults write -g NSAutomaticTextCompletionEnabled -bool false
+defaults write -g UIKitRedesignedTextCursorEnabled -bool false
+defaults write -g WebAutomaticSpellingCorrectionEnabled -bool false
 defaults write -g NSWindowResizeTime -float 0.001
 defaults write -g NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Keyboard & Input Method Anti-Stutter (Disable CursorUIViewService floating indicator & Caps Lock delay)
+defaults write kCFPreferencesAnyApplication TSMLanguageIndicatorEnabled -int 0
+defaults write com.apple.HIToolbox AppleCapsLockPressAndHoldToggleOff -int 1
+hidutil property --set '{"CapsLockDelayOverride":0}' >/dev/null 2>&1 || true
+sudo mkdir -p /Library/Preferences/FeatureFlags/Domain
+sudo defaults write /Library/Preferences/FeatureFlags/Domain/UIKit.plist redesigned_text_cursor -dict-add Enabled -bool false
 
 # Terminal configuration: prevent disk I/O freezes
 defaults write com.apple.Terminal ApplePersistenceIgnoreState -bool true
@@ -463,5 +481,7 @@ if [[ -d "$HOME/.local/opt/node" ]]; then
   rmdir "$HOME/.local/opt" 2>/dev/null || true
 fi
 
-# 11. Flush preferences cache before reboot
+# 11. Flush preferences cache and restart input/cursor services before reboot
 killall cfprefsd 2>/dev/null || true
+killall CursorUIViewService 2>/dev/null || true
+pkill -HUP -f "/System/Library/Input Methods/TCIM.app" 2>/dev/null || true
