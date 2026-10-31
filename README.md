@@ -18,6 +18,7 @@
     - [`E-Hentai / ExHentai (Reader - Auto Preload)`](#e-hentai--exhentai-reader---auto-preload)
   - [Microsoft Edge for DevTools Device Profile](#microsoft-edge-for-devtools-device-profile)
     - [Google Pixel 10 pro XL](#google-pixel-10-pro-xl)
+      - [Full 125%](#full-125)
       - [Full](#full)
       - [High](#high)
 - [Media Note](#media-note)
@@ -120,6 +121,11 @@ Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome
 ```
 
 #### Google Pixel 10 pro XL
+
+##### Full 125%
+
+- Screen: `448 x 998`
+- DPR: `3.75`
 
 ##### Full
 
