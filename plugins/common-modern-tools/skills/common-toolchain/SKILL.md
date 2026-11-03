@@ -340,3 +340,89 @@ tokei
 rg -n -M 200 "search_term" .
 tokei .
 ```
+
+---
+
+## 7. Concise Documentation & Dual-Language Protocol (Examples & Anti-Patterns)
+
+To ensure high-efficiency human collaboration and maintain global code maintainability, all documentation and code comments must strictly follow the dual-language separation and anti-hyperbole rules.
+
+### 7.1 Scope & Separation Matrix
+
+| Target Layer                                                                                         | Required Language                  | Tone & Style                                   | Prohibited Patterns                                              |
+| :--------------------------------------------------------------------------------------------------- | :--------------------------------- | :--------------------------------------------- | :--------------------------------------------------------------- |
+| **Human-Facing Docs** (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides) | **Traditional Chinese (繁體中文)** | Direct, concise, structured, empirical         | Fluff/filler, hyperbole, marketing buzzwords, Simplified Chinese |
+| **Agent Responses & Plans** (Conversational replies, `/plan`, `/boost`, walkthroughs)                | **Traditional Chinese (繁體中文)** | Direct, professional, technical                | Pleasantries, circular summaries, congratulatory remarks         |
+| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)                           | **Concise English**                | High-signal, explains constraints & "why"      | Chinese comments, non-English text, restating obvious syntax     |
+| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                                   | **Concise English**                | Conventional Commits, imperative mood          | Chinese text, vague messages (`fix bug`), verbose essays         |
+| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths)              | **Original Casing & Identifiers**  | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                          |
+
+### 7.2 Human-Facing Documentation: Anti-Patterns vs. Good Patterns
+
+#### Anti-Pattern (Hyperbolic, Fluffy & Low Signal)
+
+```markdown
+# 革命性的終極快取管理系統！
+
+這是一個令人驚嘆且無與倫比的強大解決方案！正如大家所知，快取管理一直是業界最艱難的挑戰之一。
+我們非常高興地宣布，透過這套完美的架構，您可以毫不費力地獲得難以置信的超高速體驗！
+本模組徹底顛覆了傳統做法，帶來前所未有的極致效能，讓您的專案如虎添翼！
+```
+
+#### Good Pattern (Concise, Technical & Grounded in Traditional Chinese)
+
+```markdown
+# 跨平台工作快取架構
+
+透過內容雜湊比對與依賴樹追蹤，避免重複執行無變更之建置與測試任務。
+
+## 特性與不變性
+
+- **增量比對**：以 `hashFiles('pnpm-lock.yaml')` 與原始碼 AST 雜湊決定是否命中快取。
+- **失效機制**：工作區設定或相依套件變更時自動失效並強制重新編譯。
+- **儲存邊界**：本機快取目錄限制於 `node_modules/.vite/task-cache`，不污染全域環境。
+```
+
+### 7.3 In-Code Comments: Anti-Patterns vs. Good Patterns
+
+#### Anti-Pattern (Chinese Comments or Restating Obvious Code)
+
+```ts
+// BAD: Non-English comments and explaining self-evident syntax
+// 這裡將計數器加一
+count++;
+
+// BAD: Chinese comments in source code
+// 如果使用者未登入，拋出認證錯誤
+if (!user) {
+  throw new AuthError();
+}
+```
+
+#### Good Pattern (Concise English Explaining Invariants & Rationale)
+
+```ts
+// GOOD: Explains edge cases, hardware invariants, or underlying rationale in concise English
+// Hardware invariant: active-low polarity (0 = ON, 1 = OFF) on EVM D7-D10 LEDs
+P8 = P8 & ~0x01;
+
+// Guard against race conditions during rapid re-connections
+if (!session.isActive()) {
+  throw new ConnectionTerminatedError(sessionId);
+}
+```
+
+### 7.4 Common Terminology Mapping (繁體中文技術用語)
+
+| 禁用語彙 (Simplified / Foreign) | 規範用語 (Traditional Chinese - Taiwan) |
+| :------------------------------ | :-------------------------------------- |
+| 默认                            | 預設 (Default)                          |
+| 项目                            | 專案 (Project)                          |
+| 模块                            | 模組 (Module)                           |
+| 支持                            | 支援 (Support)                          |
+| 接口                            | 介面 (Interface / API)                  |
+| 内存                            | 記憶體 (Memory)                         |
+| 优化                            | 最佳化 (Optimize)                       |
+| 兼容 / 兼容性                   | 相容 / 相容性 (Compatibility)           |
+| 脚本                            | 腳本 (Script)                           |
+| 构建                            | 建置 (Build)                            |

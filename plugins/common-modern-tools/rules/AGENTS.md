@@ -127,3 +127,24 @@
 - **Unicode Filename Normalization (NFC vs NFD)**:
   - macOS APFS normalizes filenames to decomposed form (NFD), while Windows and Linux use precomposed form (NFC).
   - When comparing or validating filenames containing non-ASCII, accented, or CJK characters, ALWAYS normalize paths via `str.normalize('NFC')`.
+
+---
+
+## 9. Concise Documentation, Anti-Hyperbole & Code-Doc Dual-Language Separation
+
+- **Concise & High-Density Communication (言簡意賅)**:
+  - Deliver direct, high-signal technical content. Strictly eliminate conversational filler, hollow pleasantries, introductory preamble (e.g. "Sure, I'd be happy to...", "As we know..."), and repetitive summaries.
+  - Structure information with concise bullet points, comparative tables, and minimal diffs rather than sprawling narrative prose.
+  - Every sentence must convey concrete technical rationale, architectural decisions, or actionable operational instructions.
+- **Anti-Hyperbole & Zero Marketing Fluff (嚴禁浮誇語氣)**:
+  - Strictly prohibit marketing superlatives, self-congratulatory praise, or exaggerated buzzwords (e.g. "revolutionary", "game-changing", "ultimate", "state-of-the-art", "seamless", "magical", "incredible", "unparalleled", "blazingly fast" without concrete benchmark metrics).
+  - Strictly avoid patronizing commentary or congratulating the user or self-generated code (e.g. "Now our solution is vastly superior and elegant!").
+  - Maintain an objective, calm, empirical, and engineering-first tone. Report constraints, trade-offs, and failure modes neutrally.
+- **Human-Facing Artifacts & Communication: Traditional Chinese (繁體中文)**:
+  - Target Scope: User-facing markdown documents (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides), PR descriptions, commit explanations for human review, implementation plans (`/plan`), walkthrough artifacts, and conversational responses.
+  - Linguistic Precision: Strict Traditional Chinese (繁體中文 - 臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化). Strictly forbid Simplified Chinese vocabulary or glyphs (e.g. 默认, 项目, 模块, 接口, 内存, 优化).
+  - Technical Identifier Integrity: Standard technical terms, CLI tools, commands, flags, package names, code symbols, API endpoints, and file paths retain their original English identifiers and casing (e.g. `pnpm`, `Vite+`, `tsconfig.json`, `git commit`, `node:path`).
+- **In-Code Comments & Symbols: Concise English (程式碼內使用簡潔英文)**:
+  - Target Scope: Source code files (`.ts`, `.js`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.), including identifiers (variable, function, class, type), inline comments (`//`, `#`, `/* */`), JSDoc/TSDoc annotations, docstrings, Git Conventional Commit messages (`feat(scope): concise summary`), and configuration keys.
+  - Clarity & Brevity: Use concise, professional, grammatical English. Explain the "why", business constraints, hardware invariants, and edge cases; never write redundant comments explaining self-evident syntax (e.g. do not write `// increment counter` above `counter++`).
+  - Strict Ban on Non-English in Code: Code comments, docstrings, and commit messages must never contain Chinese or non-English characters.
