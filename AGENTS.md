@@ -67,6 +67,9 @@ Before staging any files, all modified files must be formatted and verified:
 - **Anti-Hyperbole & Zero Marketing Fluff (嚴禁浮誇語氣)**:
   - Strictly prohibit marketing superlatives, self-congratulatory praise, or exaggerated buzzwords ("revolutionary", "game-changing", "ultimate", "state-of-the-art", "seamless", "magical", "incredible", "unparalleled", "blazingly fast" without concrete benchmark metrics).
   - Maintain an objective, calm, empirical, and engineering-first tone. Report constraints, trade-offs, and failure modes neutrally.
+- **Strict Ban on Emojis & Informal Embellishments (嚴禁表情符號與非正式表達)**:
+  - Strictly prohibit emojis (e.g. 🚀, 💡, ✨, 👉, ❌, ✅, 🎉, etc.) and informal emoticons in all agent outputs, markdown documentation, PR descriptions, commit messages, code comments, and conversational responses.
+  - Maintain a clean, professional, and plain-text-compatible engineering presentation using standard Markdown elements (bullet lists `-`, tables, code blocks, GitHub alerts `> [!NOTE]`).
 - **Human-Facing Artifacts & Communication: Traditional Chinese (繁體中文)**:
   - All implementation plans (`/plan`), walkthrough artifacts, design documents, READMEs, changelogs, user guides, PR descriptions, and conversational responses must strictly be written in **Traditional Chinese (繁體中文 - 臺灣習慣用語)**.
   - Technical terms, CLI commands, package names, code symbols, API endpoints, and file paths retain their standard casing and English identifiers (e.g. `brew upgrade`, `vite-plus`, `package.json`, `~/.local/bin`, `node:path`).

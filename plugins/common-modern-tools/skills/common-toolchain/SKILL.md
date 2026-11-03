@@ -349,13 +349,13 @@ To ensure high-efficiency human collaboration and maintain global code maintaina
 
 ### 7.1 Scope & Separation Matrix
 
-| Target Layer                                                                                         | Required Language                  | Tone & Style                                   | Prohibited Patterns                                              |
-| :--------------------------------------------------------------------------------------------------- | :--------------------------------- | :--------------------------------------------- | :--------------------------------------------------------------- |
-| **Human-Facing Docs** (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides) | **Traditional Chinese (繁體中文)** | Direct, concise, structured, empirical         | Fluff/filler, hyperbole, marketing buzzwords, Simplified Chinese |
-| **Agent Responses & Plans** (Conversational replies, `/plan`, `/boost`, walkthroughs)                | **Traditional Chinese (繁體中文)** | Direct, professional, technical                | Pleasantries, circular summaries, congratulatory remarks         |
-| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)                           | **Concise English**                | High-signal, explains constraints & "why"      | Chinese comments, non-English text, restating obvious syntax     |
-| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                                   | **Concise English**                | Conventional Commits, imperative mood          | Chinese text, vague messages (`fix bug`), verbose essays         |
-| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths)              | **Original Casing & Identifiers**  | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                          |
+| Target Layer                                                                                         | Required Language                  | Tone & Style                                   | Prohibited Patterns                                                      |
+| :--------------------------------------------------------------------------------------------------- | :--------------------------------- | :--------------------------------------------- | :----------------------------------------------------------------------- |
+| **Human-Facing Docs** (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides) | **Traditional Chinese (繁體中文)** | Direct, concise, structured, empirical         | Emojis, fluff/filler, hyperbole, marketing buzzwords, Simplified Chinese |
+| **Agent Responses & Plans** (Conversational replies, `/plan`, `/boost`, walkthroughs)                | **Traditional Chinese (繁體中文)** | Direct, professional, technical                | Emojis, pleasantries, circular summaries, congratulatory remarks         |
+| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)                           | **Concise English**                | High-signal, explains constraints & "why"      | Emojis, Chinese comments, non-English text, restating obvious syntax     |
+| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                                   | **Concise English**                | Conventional Commits, imperative mood          | Emojis, Chinese text, vague messages (`fix bug`), verbose essays         |
+| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths)              | **Original Casing & Identifiers**  | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                                  |
 
 ### 7.2 Human-Facing Documentation: Anti-Patterns vs. Good Patterns
 
@@ -426,3 +426,31 @@ if (!session.isActive()) {
 | 兼容 / 兼容性                   | 相容 / 相容性 (Compatibility)           |
 | 脚本                            | 腳本 (Script)                           |
 | 构建                            | 建置 (Build)                            |
+
+### 7.5 Strict Prohibition of Emojis & Informal Embellishments
+
+#### Anti-Pattern (Decorative Emojis & Informal Visual Noise)
+
+```markdown
+# 🚀 快速開始指南 ✨
+
+本專案支援全自動化建置！請依循下列步驟操作：
+
+- 👉 步驟一：執行 `vp install` 安裝相依套件 ✅
+- 💡 小撇步：如果遇到權限問題，請確認已設定好金鑰 🔑
+- ⚠️ 注意：切勿直接執行 commit ❌
+```
+
+#### Good Pattern (Clean, Professional & Pure Markdown)
+
+```markdown
+# 快速開始指南
+
+專案支援全自動化建置，請依循下列步驟操作：
+
+1. 執行 `vp install` 安裝相依套件。
+2. 權限設定：確認環境已正確配置存取權杖。
+
+> [!WARNING]
+> 嚴禁由 Agent 直接執行 git commit。請於完成暫存後交由工程師手動提交。
+```

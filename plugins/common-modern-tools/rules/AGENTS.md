@@ -140,6 +140,9 @@
   - Strictly prohibit marketing superlatives, self-congratulatory praise, or exaggerated buzzwords (e.g. "revolutionary", "game-changing", "ultimate", "state-of-the-art", "seamless", "magical", "incredible", "unparalleled", "blazingly fast" without concrete benchmark metrics).
   - Strictly avoid patronizing commentary or congratulating the user or self-generated code (e.g. "Now our solution is vastly superior and elegant!").
   - Maintain an objective, calm, empirical, and engineering-first tone. Report constraints, trade-offs, and failure modes neutrally.
+- **Strict Ban on Emojis & Informal Embellishments (嚴禁表情符號與非正式表達)**:
+  - Strictly prohibit emojis (e.g. 🚀, 💡, ✨, 👉, ❌, ✅, 🎉, etc.) and informal emoticons in all agent outputs, markdown documentation, PR descriptions, commit messages, code comments, and conversational responses.
+  - Maintain a clean, professional, and plain-text-compatible engineering presentation using standard Markdown elements (bullet lists `-`, tables, code blocks, GitHub alerts `> [!NOTE]`).
 - **Human-Facing Artifacts & Communication: Traditional Chinese (繁體中文)**:
   - Target Scope: User-facing markdown documents (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides), PR descriptions, commit explanations for human review, implementation plans (`/plan`), walkthrough artifacts, and conversational responses.
   - Linguistic Precision: Strict Traditional Chinese (繁體中文 - 臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化). Strictly forbid Simplified Chinese vocabulary or glyphs (e.g. 默认, 项目, 模块, 接口, 内存, 优化).
