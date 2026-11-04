@@ -182,7 +182,7 @@ $repoRoot = Split-Path -Parent $scriptDir
 & git config --global alias.br 'branch'
 & git config --global alias.ci 'commit'
 & git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-& git config --global alias.remote-init '!f() { name=$(basename $(pwd)); remote=$HOME/Documents/_GitRemote/${name}.git; git init --bare "$remote" && git remote add origin "$remote" && git push -u origin --all && git push origin --tags; }; f'
+& git config --global alias.remote-init '!f() { name=$(basename $(pwd)); remote=F:/_GitRemote/${name}.git; git init --bare "$remote" && git remote add origin "$remote" && git push -u origin --all && git push origin --tags; }; f'
 
 $gitHooksDir = Join-Path $HOME '.config\git\hooks'
 if (-not (Test-Path -LiteralPath $gitHooksDir)) {
