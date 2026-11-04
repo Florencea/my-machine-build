@@ -290,7 +290,6 @@ function Initialize-Winget {
         }
 
         Write-Host '      Registering WinGet DesktopAppInstaller package...' -ForegroundColor DarkGray
-        $installed = $false
         try {
             if ($depPaths.Count -gt 0) {
                 Add-AppxPackage -Path $wingetPath -DependencyPath $depPaths -ErrorAction Stop
@@ -298,7 +297,6 @@ function Initialize-Winget {
             else {
                 Add-AppxPackage -Path $wingetPath -ErrorAction Stop
             }
-            $installed = $true
         }
         catch {
             Write-Host "      [!] Add-AppxPackage failed: $($_.Exception.Message). Falling back to Add-AppxProvisionedPackage..." -ForegroundColor Yellow
@@ -309,7 +307,6 @@ function Initialize-Winget {
                 else {
                     Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -SkipLicense -ErrorAction Stop | Out-Null
                 }
-                $installed = $true
             }
             catch {
                 throw "Failed to install WinGet package: $($_.Exception.Message)"
