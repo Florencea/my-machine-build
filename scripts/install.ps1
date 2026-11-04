@@ -24,7 +24,7 @@ $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host 'Administrator privileges required. Requesting elevation...' -ForegroundColor Yellow
-    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File `"$PSCommandPath`"" -Verb RunAs
     exit
 }
 
@@ -39,12 +39,13 @@ if ((Get-ExecutionPolicy -Scope LocalMachine) -in @('Restricted', 'Undefined')) 
 # Enable Windows OS LongPaths support
 Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord -Force
 
-# Enable App Sideloading (required for Win10 LTSC Add-AppxPackage)
+# Enable App Sideloading and Developer Mode (required for Win10 LTSC Add-AppxPackage)
 $appUnlockPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
 if (-not (Test-Path -LiteralPath $appUnlockPath)) {
     New-Item -Path $appUnlockPath -Force | Out-Null
 }
 Set-ItemProperty -Path $appUnlockPath -Name 'AllowAllTrustedApps' -Value 1 -Type DWord -Force
+Set-ItemProperty -Path $appUnlockPath -Name 'AllowDevelopmentWithoutDevLicense' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
 
 # Workspace & VP_HOME directory resolution (Fallback to $HOME\_Workspace if E: is absent)
 if (Test-Path 'E:\') {
@@ -87,11 +88,21 @@ function Save-FileSecure {
         [string]$Uri,
         [string]$OutFile
     )
-    if (Get-Command 'curl.exe' -ErrorAction SilentlyContinue) {
-        & curl.exe -sSL -o $OutFile $Uri
+    if (Test-Path -LiteralPath $OutFile) {
+        Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
     }
-    else {
+    $success = $false
+    if (Get-Command 'curl.exe' -ErrorAction SilentlyContinue) {
+        & curl.exe -fSL --retry 3 --retry-delay 2 -o $OutFile $Uri
+        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $OutFile) -and ((Get-Item -LiteralPath $OutFile).Length -gt 0)) {
+            $success = $true
+        }
+    }
+    if (-not $success) {
         Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
+    }
+    if (-not (Test-Path -LiteralPath $OutFile) -or ((Get-Item -LiteralPath $OutFile).Length -eq 0)) {
+        throw "Failed to download valid non-empty file from '$Uri' to '$OutFile'."
     }
 }
 
@@ -181,31 +192,129 @@ function Initialize-Winget {
         }
     }
 
+    Import-Module Appx -ErrorAction SilentlyContinue
+    $existingPkg = Get-AppxPackage -Name 'Microsoft.DesktopAppInstaller' -ErrorAction SilentlyContinue
+    if ($existingPkg -and $existingPkg.InstallLocation) {
+        $pkgWinget = Join-Path $existingPkg.InstallLocation 'winget.exe'
+        if (Test-Path -LiteralPath $pkgWinget) {
+            if ($env:Path -notmatch [regex]::Escape($existingPkg.InstallLocation)) {
+                $env:Path = "$($existingPkg.InstallLocation);$env:Path"
+            }
+            if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
+                return
+            }
+        }
+    }
+
     Write-Host '      [+] WinGet not detected. Bootstrapping dependencies on Windows 10 LTSC...' -ForegroundColor Yellow
+
+    # Ensure AppX Deployment Service (AppXSvc) is enabled and running
+    $appxSvc = Get-Service -Name 'AppXSvc' -ErrorAction SilentlyContinue
+    if ($appxSvc) {
+        if ($appxSvc.StartType -eq 'Disabled') {
+            Write-Host '      Enabling AppXSvc (AppX Deployment Service)...' -ForegroundColor DarkGray
+            Set-Service -Name 'AppXSvc' -StartupType Manual -ErrorAction SilentlyContinue
+        }
+        if ($appxSvc.Status -ne 'Running') {
+            Write-Host '      Starting AppXSvc service...' -ForegroundColor DarkGray
+            Start-Service -Name 'AppXSvc' -ErrorAction SilentlyContinue
+        }
+    }
+
     $tempDir = Join-Path $env:TEMP "winget-bootstrap-$(Get-Random)"
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
     try {
-        $vclibsUrl = 'https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx'
-        $uiXamlUrl = 'https://github.com/microsoft/microsoft-ui-xaml/releases/download/v2.8.6/Microsoft.UI.Xaml.2.8.x64.appx'
-        $wingetUrl = 'https://aka.ms/getwinget'
+        $arch = if ([IntPtr]::Size -eq 8) {
+            if ($env:PROCESSOR_ARCHITECTURE -match 'ARM64') { 'arm64' } else { 'x64' }
+        }
+        else {
+            'x86'
+        }
 
-        $vclibsPath = Join-Path $tempDir 'Microsoft.VCLibs.x64.appx'
-        $uiXamlPath = Join-Path $tempDir 'Microsoft.UI.Xaml.2.8.x64.appx'
+        # Modern WinGet (v1.28+) depends on VCLibs and Microsoft.WindowsAppRuntime.1.8.
+        # These dependencies are packaged together in DesktopAppInstaller_Dependencies.zip from GitHub releases.
+        $depsUrl = 'https://github.com/microsoft/winget-cli/releases/latest/download/DesktopAppInstaller_Dependencies.zip'
+        $wingetUrl = 'https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
+
+        $depsZipPath = Join-Path $tempDir 'DesktopAppInstaller_Dependencies.zip'
+        $depsExtractDir = Join-Path $tempDir 'Dependencies'
         $wingetPath = Join-Path $tempDir 'Microsoft.DesktopAppInstaller.msixbundle'
 
-        Write-Host '      Downloading Microsoft.VCLibs...' -ForegroundColor DarkGray
-        Save-FileSecure -Uri $vclibsUrl -OutFile $vclibsPath
-        Write-Host '      Downloading Microsoft.UI.Xaml 2.8...' -ForegroundColor DarkGray
-        Save-FileSecure -Uri $uiXamlUrl -OutFile $uiXamlPath
-        Write-Host '      Downloading WinGet DesktopAppInstaller...' -ForegroundColor DarkGray
+        New-Item -ItemType Directory -Force -Path $depsExtractDir | Out-Null
+
+        Write-Host '      Downloading WinGet dependencies archive (VCLibs & WindowsAppRuntime)...' -ForegroundColor DarkGray
+        Save-FileSecure -Uri $depsUrl -OutFile $depsZipPath
+
+        Write-Host '      Extracting dependencies archive...' -ForegroundColor DarkGray
+        $extracted = $false
+        if (Get-Command 'tar.exe' -ErrorAction SilentlyContinue) {
+            & tar.exe -xf $depsZipPath -C $depsExtractDir
+            if ($LASTEXITCODE -eq 0) {
+                $extracted = $true
+            }
+        }
+        if (-not $extracted) {
+            Expand-Archive -Path $depsZipPath -DestinationPath $depsExtractDir -Force
+        }
+
+        Write-Host '      Downloading WinGet DesktopAppInstaller package...' -ForegroundColor DarkGray
         Save-FileSecure -Uri $wingetUrl -OutFile $wingetPath
 
-        Write-Host '      Registering VCLibs & UI.Xaml dependencies...' -ForegroundColor DarkGray
-        Add-AppxPackage -Path $vclibsPath
-        Add-AppxPackage -Path $uiXamlPath
+        # Locate matching architecture dependencies (e.g. x64/ or arm64/)
+        $targetArchDir = Join-Path $depsExtractDir $arch
+        $depFiles = @()
+        if (Test-Path -LiteralPath $targetArchDir) {
+            $depFiles = @(Get-ChildItem -LiteralPath $targetArchDir -Filter '*.appx' | Sort-Object Name)
+        }
+        else {
+            $depFiles = @(Get-ChildItem -LiteralPath $depsExtractDir -Recurse -Filter '*.appx' |
+                Where-Object { $_.FullName -match $arch } |
+                Sort-Object Name)
+        }
 
-        Write-Host '      Registering WinGet App Installer package...' -ForegroundColor DarkGray
-        Add-AppxPackage -Path $wingetPath -DependencyPath @($vclibsPath, $uiXamlPath)
+        if ($depFiles.Count -eq 0) {
+            throw "No matching dependency packages found for architecture: $arch"
+        }
+
+        $depPaths = @()
+        Write-Host "      Registering framework dependencies ($arch)..." -ForegroundColor DarkGray
+        foreach ($dep in $depFiles) {
+            Write-Host "        - Installing dependency: $($dep.Name)" -ForegroundColor DarkGray
+            try {
+                Add-AppxPackage -Path $dep.FullName -ErrorAction Stop
+            }
+            catch {
+                Write-Host "          [Note] $($_.Exception.Message.Trim())" -ForegroundColor DarkGray
+            }
+            $depPaths += $dep.FullName
+        }
+
+        Write-Host '      Registering WinGet DesktopAppInstaller package...' -ForegroundColor DarkGray
+        $installed = $false
+        try {
+            if ($depPaths.Count -gt 0) {
+                Add-AppxPackage -Path $wingetPath -DependencyPath $depPaths -ErrorAction Stop
+            }
+            else {
+                Add-AppxPackage -Path $wingetPath -ErrorAction Stop
+            }
+            $installed = $true
+        }
+        catch {
+            Write-Host "      [!] Add-AppxPackage failed: $($_.Exception.Message). Falling back to Add-AppxProvisionedPackage..." -ForegroundColor Yellow
+            try {
+                if ($depPaths.Count -gt 0) {
+                    Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -DependencyPackagePath $depPaths -SkipLicense -ErrorAction Stop | Out-Null
+                }
+                else {
+                    Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -SkipLicense -ErrorAction Stop | Out-Null
+                }
+                $installed = $true
+            }
+            catch {
+                throw "Failed to install WinGet package: $($_.Exception.Message)"
+            }
+        }
 
         if (Test-Path -LiteralPath $windowsAppsDir) {
             if ($env:Path -notmatch [regex]::Escape($windowsAppsDir)) {
@@ -213,9 +322,29 @@ function Initialize-Winget {
             }
         }
 
+        $newPkg = Get-AppxPackage -Name 'Microsoft.DesktopAppInstaller' -ErrorAction SilentlyContinue
+        if ($newPkg -and $newPkg.InstallLocation) {
+            $pkgWinget = Join-Path $newPkg.InstallLocation 'winget.exe'
+            if (Test-Path -LiteralPath $pkgWinget) {
+                if ($env:Path -notmatch [regex]::Escape($newPkg.InstallLocation)) {
+                    $env:Path = "$($newPkg.InstallLocation);$env:Path"
+                }
+            }
+        }
+
+        Update-SessionPath
+
+        if (-not (Get-Command 'winget' -ErrorAction SilentlyContinue)) {
+            throw "WinGet installed successfully, but 'winget.exe' could not be located in PATH."
+        }
+
         Write-Host '      Initializing WinGet package source agreements...' -ForegroundColor DarkGray
         & winget source update --disable-interactivity 2>$null | Out-Null
         Write-Host '      [OK] WinGet bootstrapped successfully.' -ForegroundColor Green
+    }
+    catch {
+        Write-Host "      [ERROR] WinGet bootstrap failed: $($_.Exception.Message)" -ForegroundColor Red
+        throw
     }
     finally {
         if (Test-Path -LiteralPath $tempDir) {
