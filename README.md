@@ -39,7 +39,8 @@
   - [Set DNS Servers with CLI](#set-dns-servers-with-cli)
   - [Clear DNS Cache](#clear-dns-cache)
   - [CDN Alias](#cdn-alias)
-- [Windows 11 Note](#windows-11-note)
+- [Windows 11 & Windows 10 IoT LTSC Note](#windows-11--windows-10-iot-ltsc-note)
+  - [Fresh Machine Bootstrap (Windows 11 / Windows 10 IoT LTSC)](#fresh-machine-bootstrap-windows-11--windows-10-iot-ltsc)
   - [Dev Drive (ReFS)](#dev-drive-refs)
   - [Vite+ & Cache Relocation (`E:\vite-plus`)](#vite--cache-relocation-evite-plus)
   - [Inspect & Prune User PATH](#inspect--prune-user-path)
@@ -419,7 +420,28 @@ pbs.twimg.com -> CNAME pbs.twimg.com.cdn.cloudflare.net (Fast, at Taiwan)
               -> CNAME dualstack.twimg.twitter.map.fastly.net  (Slow, at SG)
 ```
 
-## Windows 11 Note
+## Windows 11 & Windows 10 IoT LTSC Note
+
+### Fresh Machine Bootstrap (Windows 11 / Windows 10 IoT LTSC)
+
+#### 1. Unblock PowerShell Execution Policy
+
+Windows PowerShell 5.1 defaults to `Restricted` execution policy on clean Windows installations. Run this one-liner in PowerShell to allow script execution:
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+```
+
+#### 2. Run Setup Script
+
+Right-click `scripts\install.ps1` in File Explorer and select **Run with PowerShell**, or execute directly in terminal:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\install.ps1
+```
+
+> [!NOTE]
+> The script automatically requests Administrator elevation via UAC if not already elevated. On Windows 10 IoT Enterprise LTSC, it automatically bootstraps `winget` prerequisites, installs Windows Terminal, enables OS long paths support, and falls back gracefully to `$HOME\_Workspace` and `$HOME\.vite-plus` if drive `E:\` is absent.
 
 ### Dev Drive (ReFS)
 

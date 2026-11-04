@@ -1,22 +1,103 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Idempotent Windows 11 modern development environment & Antigravity setup script.
+    Idempotent Windows 11 & Windows 10 IoT LTSC modern development environment setup script.
 .DESCRIPTION
-    Compatible with both Windows PowerShell 5.1 (in-box default on Windows 11) and PowerShell 7+ (pwsh).
-    Strictly avoids PowerShell 7-only syntax operators (? :, ??, ?., &&, ||) so it can bootstrap a fresh Windows 11 machine.
+    Compatible with both Windows PowerShell 5.1 (in-box default on Windows 10/11) and PowerShell 7+ (pwsh).
+    Strictly avoids PowerShell 7-only syntax operators (? :, ??, ?., &&, ||) so it can bootstrap a fresh machine.
+    Automatically self-elevates to Administrator, bootstraps winget on LTSC, and configures modern toolchains.
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Enforce TLS 1.2 for network downloads in Windows PowerShell 5.1
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-Write-Host '=== Starting Windows 11 Modern Dev Environment Setup ===' -ForegroundColor Cyan
+# Self-elevation to Administrator if running under standard user
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+$isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host 'Administrator privileges required. Requesting elevation...' -ForegroundColor Yellow
+    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
 
-# 1. Dev Drive & Workspace Initialization
-$workspaceDir = 'E:\_Workspace'
+# Ensure persistent ExecutionPolicy for subsequent sessions and CLI utilities
+if ((Get-ExecutionPolicy -Scope CurrentUser) -in @('Restricted', 'Undefined')) {
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+}
+if ((Get-ExecutionPolicy -Scope LocalMachine) -in @('Restricted', 'Undefined')) {
+    Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
+}
+
+# Enable Windows OS LongPaths support
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord -Force
+
+# Enable App Sideloading (required for Win10 LTSC Add-AppxPackage)
+$appUnlockPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+if (-not (Test-Path -LiteralPath $appUnlockPath)) {
+    New-Item -Path $appUnlockPath -Force | Out-Null
+}
+Set-ItemProperty -Path $appUnlockPath -Name 'AllowAllTrustedApps' -Value 1 -Type DWord -Force
+
+# Workspace & VP_HOME directory resolution (Fallback to $HOME\_Workspace if E: is absent)
+if (Test-Path 'E:\') {
+    $workspaceDir = 'E:\_Workspace'
+    $vpHome = 'E:\vite-plus'
+}
+else {
+    $workspaceDir = Join-Path $HOME '_Workspace'
+    $vpHome = Join-Path $HOME '.vite-plus'
+}
+
+# Helper function to refresh PATH inside current process
+function Update-SessionPath {
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $combined = @(
+        ($machinePath -split ';') + ($userPath -split ';') |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+    ) | Select-Object -Unique
+
+    $extraPaths = @(
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'),
+        'C:\Program Files\Git\cmd',
+        'C:\Program Files\PowerShell\7',
+        (Join-Path $vpHome 'bin'),
+        (Join-Path $HOME '.vite-plus\bin')
+    )
+    foreach ($p in $extraPaths) {
+        if ((Test-Path -LiteralPath $p) -and ($combined -notcontains $p)) {
+            $combined += $p
+        }
+    }
+    $env:Path = $combined -join ';'
+}
+
+# Helper function to download files safely
+function Download-FileSecure {
+    param(
+        [string]$Uri,
+        [string]$OutFile
+    )
+    if (Get-Command 'curl.exe' -ErrorAction SilentlyContinue) {
+        & curl.exe -sSL -o $OutFile $Uri
+    }
+    else {
+        Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
+    }
+}
+
+Write-Host '=== Starting Windows Modern Dev Environment Setup ===' -ForegroundColor Cyan
+
+# 1. Workspace Directory Initialization
 if (-not (Test-Path -LiteralPath $workspaceDir)) {
     Write-Host "[1/9] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
     New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
@@ -49,17 +130,7 @@ function Install-InternalRootCA {
 
     Write-Host "      [+] Trusting $Name ($thumbprint)..." -ForegroundColor Green
 
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-    $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-    if ($isAdmin) {
-        $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
-    }
-    else {
-        $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
-    }
-
+    $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
     $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', $storeLocation)
     try {
         $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
@@ -73,8 +144,7 @@ function Install-InternalRootCA {
 Install-InternalRootCA -Name 'BHPD Internal Root CA' -Base64Cert $bhpdRootCaB64
 Install-InternalRootCA -Name 'BHGS Internal Root CA' -Base64Cert $bhgsRootCaB64
 
-# 3. Vite+ Home & Cache Relocation (E:\vite-plus)
-$vpHome = 'E:\vite-plus'
+# 3. Vite+ Home & Cache Relocation
 if ([Environment]::GetEnvironmentVariable('VP_HOME', 'User') -ne $vpHome) {
     Write-Host "[3/9] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
     [Environment]::SetEnvironmentVariable('VP_HOME', $vpHome, 'User')
@@ -85,6 +155,7 @@ $env:VP_PM_MANAGER = 'yes'
 if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
     Write-Host '      Installing Vite+ toolchain...' -ForegroundColor Yellow
     Invoke-RestMethod -Uri 'https://vite.plus/ps1' | Invoke-Expression
+    Update-SessionPath
     if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
         & vp env default lts
         & vp env install lts
@@ -94,17 +165,77 @@ else {
     Write-Host '[3/9] Vite+ toolchain is ready.' -ForegroundColor DarkGray
 }
 
-# 4. Idempotent Winget Package Installation
+# 4. WinGet Bootstrap & Package Installation
+function Ensure-Winget {
+    if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
+        return
+    }
+    $windowsAppsDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    $localAppsWinget = Join-Path $windowsAppsDir 'winget.exe'
+    if (Test-Path -LiteralPath $localAppsWinget) {
+        if ($env:Path -notmatch [regex]::Escape($windowsAppsDir)) {
+            $env:Path = "$windowsAppsDir;$env:Path"
+        }
+        if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
+            return
+        }
+    }
+
+    Write-Host '      [+] WinGet not detected. Bootstrapping dependencies on Windows 10 LTSC...' -ForegroundColor Yellow
+    $tempDir = Join-Path $env:TEMP "winget-bootstrap-$(Get-Random)"
+    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+    try {
+        $vclibsUrl = 'https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx'
+        $uiXamlUrl = 'https://github.com/microsoft/microsoft-ui-xaml/releases/download/v2.8.6/Microsoft.UI.Xaml.2.8.x64.appx'
+        $wingetUrl = 'https://aka.ms/getwinget'
+
+        $vclibsPath = Join-Path $tempDir 'Microsoft.VCLibs.x64.appx'
+        $uiXamlPath = Join-Path $tempDir 'Microsoft.UI.Xaml.2.8.x64.appx'
+        $wingetPath = Join-Path $tempDir 'Microsoft.DesktopAppInstaller.msixbundle'
+
+        Write-Host '      Downloading Microsoft.VCLibs...' -ForegroundColor DarkGray
+        Download-FileSecure -Uri $vclibsUrl -OutFile $vclibsPath
+        Write-Host '      Downloading Microsoft.UI.Xaml 2.8...' -ForegroundColor DarkGray
+        Download-FileSecure -Uri $uiXamlUrl -OutFile $uiXamlPath
+        Write-Host '      Downloading WinGet DesktopAppInstaller...' -ForegroundColor DarkGray
+        Download-FileSecure -Uri $wingetUrl -OutFile $wingetPath
+
+        Write-Host '      Registering VCLibs & UI.Xaml dependencies...' -ForegroundColor DarkGray
+        Add-AppxPackage -Path $vclibsPath
+        Add-AppxPackage -Path $uiXamlPath
+
+        Write-Host '      Registering WinGet App Installer package...' -ForegroundColor DarkGray
+        Add-AppxPackage -Path $wingetPath -DependencyPath @($vclibsPath, $uiXamlPath)
+
+        if (Test-Path -LiteralPath $windowsAppsDir) {
+            if ($env:Path -notmatch [regex]::Escape($windowsAppsDir)) {
+                $env:Path = "$windowsAppsDir;$env:Path"
+            }
+        }
+
+        Write-Host '      Initializing WinGet package source agreements...' -ForegroundColor DarkGray
+        & winget source update --disable-interactivity 2>$null | Out-Null
+        Write-Host '      [OK] WinGet bootstrapped successfully.' -ForegroundColor Green
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempDir) {
+            Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Ensure-Winget
+
 function Install-WingetIdempotent {
     param([string]$Id, [string]$Name)
     if ($Id -eq 'AgileBits.1Password') {
-        $check1P = & winget list 1Password 2>$null
+        $check1P = & winget list 1Password --accept-source-agreements --disable-interactivity 2>$null
         if ($check1P -match '1Password') {
             Write-Host "      [OK] $Name is already installed." -ForegroundColor DarkGray
             return
         }
     }
-    $check = & winget list --id $Id -e 2>$null
+    $check = & winget list --id $Id -e --accept-source-agreements --disable-interactivity 2>$null
     if ($check -match [regex]::Escape($Id)) {
         Write-Host "      [OK] $Name ($Id) is already installed." -ForegroundColor DarkGray
     }
@@ -147,6 +278,7 @@ foreach ($pkg in $cliPackages) {
 $desktopPackages = @(
     @{ Id = 'Git.Git'; Name = 'Git for Windows' },
     @{ Id = 'Microsoft.VisualStudioCode'; Name = 'Visual Studio Code' },
+    @{ Id = 'Microsoft.WindowsTerminal'; Name = 'Windows Terminal' },
     @{ Id = 'AgileBits.1Password'; Name = '1Password' },
     @{ Id = 'WinMerge.WinMerge'; Name = 'WinMerge' },
     @{ Id = 'RevoUninstaller.RevoUninstaller'; Name = 'Revo Uninstaller' },
@@ -157,6 +289,9 @@ foreach ($pkg in $desktopPackages) {
 }
 
 & winget pin add --id Microsoft.Edge --blocking 2>$null | Out-Null
+
+# Refresh in-process PATH so git, pwsh, code etc. are immediately visible
+Update-SessionPath
 
 # 5. Global Git Configuration & Pre-Commit Safety Hook
 Write-Host '[5/9] Configuring Global Git Settings & Pre-Commit Hook...' -ForegroundColor Cyan
@@ -169,7 +304,25 @@ $repoRoot = Split-Path -Parent $scriptDir
 & git config --global core.quotepath false
 & git config --global core.longpaths true
 & git config --global core.autocrlf false
-& git config --global core.sshCommand 'C:/Windows/System32/OpenSSH/ssh.exe'
+
+$systemSsh = 'C:\Windows\System32\OpenSSH\ssh.exe'
+if (-not (Test-Path -LiteralPath $systemSsh)) {
+    Write-Host '      Checking OpenSSH Client Capability...' -ForegroundColor DarkGray
+    try {
+        Add-WindowsCapability -Online -Name 'OpenSSH.Client~~~~0.0.1.0' -ErrorAction Stop | Out-Null
+    }
+    catch {
+        Write-Warning "Could not install OpenSSH Client capability: $_"
+    }
+}
+
+if (Test-Path -LiteralPath $systemSsh) {
+    & git config --global core.sshCommand 'C:/Windows/System32/OpenSSH/ssh.exe'
+}
+else {
+    & git config --global --unset-all core.sshCommand 2>$null
+}
+
 & git config --global --unset-all core.fsmonitor 2>$null
 & git config --global --unset-all core.untrackedcache 2>$null
 & git config --global init.defaultBranch main
@@ -197,19 +350,41 @@ if (Test-Path -LiteralPath $srcPreCommit) {
 
 # 6. Windows Terminal & VS Code Configuration
 Write-Host '[6/9] Configuring Terminal Defaults to PowerShell 7...' -ForegroundColor Cyan
-$wtSettings = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+
+$wtLocalState = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState'
+$wtSettings = Join-Path $wtLocalState 'settings.json'
+if (-not (Test-Path -LiteralPath $wtLocalState)) {
+    $wtPkg = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe'
+    if (Test-Path -LiteralPath $wtPkg) {
+        New-Item -ItemType Directory -Force -Path $wtLocalState | Out-Null
+    }
+}
+
 if (Test-Path -LiteralPath $wtSettings) {
     try {
         $json = Get-Content -LiteralPath $wtSettings -Raw | ConvertFrom-Json
-        $json.defaultProfile = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
-        [System.IO.File]::WriteAllText($wtSettings, ($json | ConvertTo-Json -Depth 10), $utf8NoBom)
+        if ($json.defaultProfile -ne '{574e775e-4f2a-5b96-ac1e-a2962a402336}') {
+            $json.defaultProfile = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
+            [System.IO.File]::WriteAllText($wtSettings, ($json | ConvertTo-Json -Depth 10), $utf8NoBom)
+        }
     }
     catch {
         Write-Warning "Could not update Windows Terminal settings automatically: $_"
     }
 }
+elseif (Test-Path -LiteralPath $wtLocalState) {
+    $initialWt = @{
+        '$schema' = 'https://aka.ms/terminal-profiles-schema'
+        defaultProfile = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
+    } | ConvertTo-Json
+    [System.IO.File]::WriteAllText($wtSettings, $initialWt, $utf8NoBom)
+}
 
-$codeSettings = Join-Path $env:APPDATA 'Code\User\settings.json'
+$codeUserDir = Join-Path $env:APPDATA 'Code\User'
+if (-not (Test-Path -LiteralPath $codeUserDir)) {
+    New-Item -ItemType Directory -Force -Path $codeUserDir | Out-Null
+}
+$codeSettings = Join-Path $codeUserDir 'settings.json'
 if (Test-Path -LiteralPath $codeSettings) {
     $content = Get-Content -LiteralPath $codeSettings -Raw
     if ($content -notmatch '"terminal\.integrated\.defaultProfile\.windows"') {
@@ -225,14 +400,24 @@ if (Test-Path -LiteralPath $codeSettings) {
         }
     }
 }
-
-# 7. PowerShell 7 Profile Setup ($PROFILE)
-Write-Host "[7/9] Setting up PowerShell 7 `$PROFILE..." -ForegroundColor Cyan
-$ps7Dir = Join-Path $HOME 'Documents\PowerShell'
-if (-not (Test-Path -LiteralPath $ps7Dir)) {
-    New-Item -ItemType Directory -Force -Path $ps7Dir | Out-Null
+else {
+    $initialCode = "{\r\n  `"terminal.integrated.defaultProfile.windows`": `"PowerShell`"\r\n}\r\n"
+    [System.IO.File]::WriteAllText($codeSettings, $initialCode, $utf8NoBom)
 }
-$profilePath = Join-Path $ps7Dir 'Microsoft.PowerShell_profile.ps1'
+
+# 7. PowerShell Profiles Setup ($PROFILE for PowerShell 7 and Windows PowerShell 5.1)
+Write-Host "[7/9] Setting up PowerShell Profile..." -ForegroundColor Cyan
+
+$docsDir = [Environment]::GetFolderPath('MyDocuments')
+if (-not (Test-Path -LiteralPath $docsDir)) {
+    $docsDir = Join-Path $HOME 'Documents'
+}
+
+$profileDirs = @(
+    (Join-Path $docsDir 'PowerShell'),
+    (Join-Path $docsDir 'WindowsPowerShell')
+)
+
 $profileContent = @'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -246,7 +431,22 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
     } catch {}
 }
 '@
-[System.IO.File]::WriteAllText($profilePath, $profileContent, $utf8NoBom)
+
+foreach ($pDir in $profileDirs) {
+    if (-not (Test-Path -LiteralPath $pDir)) {
+        New-Item -ItemType Directory -Force -Path $pDir | Out-Null
+    }
+    $pPath = Join-Path $pDir 'Microsoft.PowerShell_profile.ps1'
+    if (Test-Path -LiteralPath $pPath) {
+        $existing = Get-Content -LiteralPath $pPath -Raw
+        if ($existing.Trim() -ne $profileContent.Trim()) {
+            [System.IO.File]::WriteAllText($pPath, $profileContent, $utf8NoBom)
+        }
+    }
+    else {
+        [System.IO.File]::WriteAllText($pPath, $profileContent, $utf8NoBom)
+    }
+}
 
 # 8. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
 Write-Host '[8/9] Syncing Antigravity Plugins...' -ForegroundColor Cyan
@@ -284,7 +484,11 @@ if ($rawUserPath) {
     $currentUserPath = @(
         $rawUserPath -split ';' |
             ForEach-Object { $_.Trim().TrimEnd('\') } |
-            Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+            Where-Object {
+                if (-not $_) { return $false }
+                $expanded = [Environment]::ExpandEnvironmentVariables($_)
+                Test-Path -LiteralPath $expanded
+            }
     )
 }
 
