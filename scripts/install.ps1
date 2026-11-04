@@ -81,8 +81,8 @@ function Update-SessionPath {
     $env:Path = $combined -join ';'
 }
 
-# Helper function to download files safely
-function Download-FileSecure {
+# Helper function to download and save files securely
+function Save-FileSecure {
     param(
         [string]$Uri,
         [string]$OutFile
@@ -166,7 +166,7 @@ else {
 }
 
 # 4. WinGet Bootstrap & Package Installation
-function Ensure-Winget {
+function Initialize-Winget {
     if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
         return
     }
@@ -194,11 +194,11 @@ function Ensure-Winget {
         $wingetPath = Join-Path $tempDir 'Microsoft.DesktopAppInstaller.msixbundle'
 
         Write-Host '      Downloading Microsoft.VCLibs...' -ForegroundColor DarkGray
-        Download-FileSecure -Uri $vclibsUrl -OutFile $vclibsPath
+        Save-FileSecure -Uri $vclibsUrl -OutFile $vclibsPath
         Write-Host '      Downloading Microsoft.UI.Xaml 2.8...' -ForegroundColor DarkGray
-        Download-FileSecure -Uri $uiXamlUrl -OutFile $uiXamlPath
+        Save-FileSecure -Uri $uiXamlUrl -OutFile $uiXamlPath
         Write-Host '      Downloading WinGet DesktopAppInstaller...' -ForegroundColor DarkGray
-        Download-FileSecure -Uri $wingetUrl -OutFile $wingetPath
+        Save-FileSecure -Uri $wingetUrl -OutFile $wingetPath
 
         Write-Host '      Registering VCLibs & UI.Xaml dependencies...' -ForegroundColor DarkGray
         Add-AppxPackage -Path $vclibsPath
@@ -224,7 +224,7 @@ function Ensure-Winget {
     }
 }
 
-Ensure-Winget
+Initialize-Winget
 
 function Install-WingetIdempotent {
     param([string]$Id, [string]$Name)
