@@ -454,3 +454,82 @@ if (!session.isActive()) {
 > [!WARNING]
 > 嚴禁由 Agent 直接執行 git commit。請於完成暫存後交由工程師手動提交。
 ```
+
+### 7.6 Document Self-Containment: Resolving Contextual Dangling on Revision
+
+When asked in chat to modify or update an existing document, agents often make the fatal mistake of writing from "within the chat context" (assuming the reader knows what was discussed), omitting key definitions and creating an unreadable document for external readers.
+
+#### Anti-Pattern (Implicit Context & Dangling Presuppositions)
+
+```markdown
+## 快取機制修正
+
+為了修復剛才討論的並行問題，我們不再使用原本的作法，改為使用樂觀鎖來確保資料正確性。
+```
+
+#### Good Pattern (Self-Contained & Hermetic for Offline Readers)
+
+```markdown
+## 併發寫入控制架構
+
+### 問題定義
+
+在多程序或分散式環境下，當多個程序同時讀取相同快取實體並嘗試寫入時，若缺乏並行控制，後寫入者將覆蓋先寫入者的異動，造成更新遺失（Lost Update）。
+
+### 樂觀並行控制規格
+
+為防止更新遺失，快取資料結構包含 `version: number` 欄位：
+
+- 讀取時獲取當前版本號。
+- 寫入時執行原子比較（CAS）：若資料庫目前版本號等於讀取版本號，則更新並將 `version` 遞增 1；若版本不符，拋出 `OptimisticLockException` 並由呼叫端重試。
+```
+
+### 7.7 Anti-Sycophancy: Mandatory Trade-off Matrix vs. "Current Way is the Best"
+
+Keywords blacklists fail because LLMs simply switch to rephrased superlatives ("the most ideal choice", "demonstrating unmatched advantages"). The only engineering solution is the **Mandatory Trade-off Protocol**: every proposal must explicitly state costs, drawbacks, and anti-use cases.
+
+#### Anti-Pattern (Sales Pitch, Self-Praise & Single-Sided Advocacy)
+
+```markdown
+## 快取技術選型
+
+我們經過深入評估，採用 Redis 是目前最棒、最理想的極佳選擇！該設計不僅非常優雅，而且能帶來令人驚嘆的極致低延遲，完美解決專案所有效能瓶頸。
+```
+
+#### Good Pattern (Objective Engineering Trade-off with Costs & Anti-Use Cases)
+
+```markdown
+## 記憶體快取架構選型
+
+### 選用技術：Redis
+
+為滿足「跨微服務節點共享快取狀態」與「讀取延遲 < 5ms」之硬性約束，選用 Redis 作為分散式快取儲存。
+
+### 引入代價與妥協 (Incurred Trade-offs & Costs)
+
+- **維護複雜度**：需額外維護 Redis 叢集高可用性（Sentinel / Cluster）及監控警報機制。
+- **網路額外開銷**：相較於行程內記憶體快取（如 In-Memory LRU），每次讀取多出單趟 TCP 網路往返（約 1~2ms）。
+- **序列化成本**：所有物件儲存與提取皆需經歷 JSON 或二進位序列化與反序列化。
+
+### 不適用場景 (Anti-Use Cases)
+
+- 單機獨立執行且無跨行程共享需求之 CLI 工具（此情境應使用行程內記憶體快取，避免不必要的外部相依）。
+```
+
+### 7.8 Zero Dialogue Leakage: Standalone Spec vs. Chat Residue
+
+#### Anti-Pattern (Conversational Leakage into Document)
+
+```markdown
+## 說明
+
+回答您的問題，我已經為您規劃好 API 路由結構，請您確認下方內容是否符合您的需求...
+```
+
+#### Good Pattern (Third-Person Impersonal Standalone Spec)
+
+```markdown
+## 系統 API 路由規格
+
+本文件定義使用者認證與權限檢驗端點之請求規格與回應結構。
+```
