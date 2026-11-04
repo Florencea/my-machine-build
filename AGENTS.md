@@ -61,34 +61,40 @@ Before staging any files, all modified files must be formatted and verified:
 
 ## 4. Documentation, Language & Communication Standards
 
-- **Document Self-Containment Invariant & Offline Reader Test (文件自給自足與離線讀者盲測)**:
+- **Document Language Preservation & Codebase Fidelity**:
+  - **In-Place Modifications & Document Updates**: When modifying, editing, or extending existing documents (`*.md`, `*.txt`, RFCs, specs, `README.md`, `CHANGELOG.md`), agents MUST detect and strictly preserve the document's primary/source language. If an existing document is written in English, all additions, modifications, and explanations within that file MUST be written in English. NEVER inject Traditional Chinese into an English document (or vice versa) unless explicitly requested to perform localization/translation.
+  - **New Project-Level Documentation**: New documentation created inside a codebase (`README.md`, `CHANGELOG.md`, design specs, API references) must adhere to the project's primary language. Default to English for international, open-source, or English-first repositories; use Traditional Chinese only if the repository is specifically configured or requested for Traditional Chinese audiences.
+- **Document Self-Containment Invariant & Offline Reader Test**:
   - All documentation (`*.md`, RFCs, specs, READMEs, CHANGELOGs, PR descriptions, plans, walkthroughs) must be completely self-contained and hermetic.
   - **The Offline Reader Test**: Write every document under the invariant that the reader is a third-party engineer reading the file weeks later on GitHub/Confluence with zero knowledge of the chat history.
-  - **Context Reification on Revision (修訂時顯式沉澱背景與問題定義)**: When asked in chat to modify, update, or fix a document, NEVER rely on implicit chat context or dangling references (e.g., NEVER write "adjusted to fix the aforementioned problem", "as discussed earlier", "switched to the new approach to avoid errors"). You MUST explicitly state the technical context, trigger conditions, and problem definition inside the document text itself (e.g., "Under concurrent write conditions, race conditions between processes A and B can cause lost updates; to prevent this, an optimistic locking strategy using a version column is introduced.").
-- **Dual-Mode Audience Separation & Zero Dialogue Leakage (雙模態受眾邊界與零對話滲漏)**:
-  - **Mode A: Dialogue Mode (對話回應模式)**: Interactive developer collaboration. Deliver high-density, concise technical status. Strictly forbid condescending prompts, hollow fillers, or nagging phrasing (e.g. NEVER "回答我", "請確認上述內容是否符合需求"). If user input is needed, provide objective bulleted options or explicit technical decision points.
-  - **Mode B: Document Authoring Mode (獨立文件輸出模式)**: Standalone engineering assets for third-party readers and maintainers. Strict Zero Dialogue Leakage:
+  - **Context Reification on Revision**: When asked in chat to modify, update, or fix a document, NEVER rely on implicit chat context or dangling references (e.g. NEVER write "adjusted to fix the aforementioned problem", "as discussed earlier", "switched to the new approach to avoid errors"). You MUST explicitly state the technical context, trigger conditions, and problem definition inside the document text itself.
+- **Dual-Mode Audience Separation & Zero Dialogue Leakage**:
+  - **Mode A: Dialogue Mode**: Interactive developer collaboration. Deliver high-density, concise technical status. Strictly forbid condescending prompts, hollow fillers, or nagging phrasing (e.g. NEVER "回答我", "請確認上述內容是否符合需求"). If user input is needed, provide objective bulleted options or explicit technical decision points.
+  - **Mode B: Document Authoring Mode**: Standalone engineering assets for third-party readers and maintainers. Strict Zero Dialogue Leakage:
     - Strictly prohibit first-person ("I", "we", "the author", "我", "我們") and second-person ("you", "你", "您").
     - Strictly prohibit conversational greetings, openings, or closures (e.g. NEVER "回答您的問題", "如您所詢問", "以下為您整理", "正如剛才討論的").
     - Use impersonal third-person statements or imperative mood.
-- **Zero Superlatives & Mandatory Trade-off Protocol (零最高級與強制工程權衡契約)**:
+- **Zero Superlatives & Mandatory Trade-off Protocol**:
   - **Eliminate Sales Pitch & Sycophancy ("Current approach is the best")**:
     - Strictly prohibit all superlatives and absolute positive assertions: "best", "optimal", "most suitable", "ideal", "flawless", "最優", "最佳", "首選", "最合適", "最理想", "最具優勢".
     - Strictly prohibit self-congratulatory evaluative praise on self-generated solutions: "elegant", "robust", "superior", "perfect", "優雅", "健全", "完美".
     - Replace subjective value judgments with objective physical properties and operational consequences.
-  - **Mandatory Trade-off Matrix (反向對衝約束)**:
+  - **Mandatory Trade-off Matrix**:
     - When documenting any technical choice, architecture design, or proposal, NEVER present only benefits.
     - Every proposal MUST explicitly document: (1) **Hard constraints satisfied**, (2) **Incurred trade-offs & costs** (e.g. added complexity, dependency footprint, cold-start latency, maintenance overhead), and (3) **Anti-use cases / when NOT to use**.
 - **Anti-Hyperbole, Fact-First Syntax & Strict Ban on Emojis**:
   - Prohibit marketing superlatives and unquantifiable buzzwords ("revolutionary", "game-changing", "seamless", "magical", "blazingly fast", "卓越", "極致", "強大", "賦能").
   - Express facts through verbs, conditions, and measurable metrics: "Latency reduced from 250ms to 15ms" instead of "extremely fast".
   - Strictly prohibit emojis (🚀, 💡, ✨, 👉, ❌, ✅, 🎉, etc.) and informal emoticons across all outputs.
-- **Human-Facing Artifacts & Communication: Traditional Chinese (繁體中文)**:
-  - All implementation plans (`/plan`), walkthrough artifacts, design documents, READMEs, changelogs, user guides, PR descriptions, and conversational responses must strictly be written in **Traditional Chinese (繁體中文 - 臺灣習慣用語)**.
-  - Technical terms, CLI commands, package names, code symbols, API endpoints, and file paths retain their standard casing and English identifiers (e.g. `brew upgrade`, `vite-plus`, `package.json`, `~/.local/bin`, `node:path`).
-- **In-Code Comments & Symbols: Concise English (程式碼內使用簡潔英文)**:
-  - Source code files (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, etc.), identifiers, inline comments (`//`, `#`, `/* */`), docstrings, Git Conventional Commit messages, and configuration keys must strictly use concise, professional English.
-  - Comments must explain "why", constraints, invariants, and edge cases; never write redundant comments explaining self-evident syntax. Strictly prohibit Chinese or non-English characters in source code comments and commit messages.
+- **Agent Dialogue & Human-Review Artifacts: Traditional Chinese**:
+  - **Target Scope**: Conversational chat responses, implementation plans (`<plan_name>.md` triggered via `/plan`), walkthrough artifacts (`walkthrough.md`), and commit explanations provided in chat for human developer review.
+  - **Strict Separation from Project Files**: Chat dialogue and meta-artifacts are written in Traditional Chinese to collaborate with the human developer, but this requirement NEVER applies to in-repo code, in-repo English documentation, or existing English files.
+  - **Linguistic Precision**: Strict Traditional Chinese (臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化). Strictly forbid Simplified Chinese vocabulary or glyphs (e.g. 默认, 项目, 模块, 接口, 内存, 优化).
+  - **Technical Identifier Integrity**: Standard technical terms, CLI tools, commands, flags, package names, code symbols, API endpoints, and file paths retain their original English identifiers and casing (e.g. `pnpm`, `Vite+`, `tsconfig.json`, `git commit`, `node:path`).
+- **Code, In-Code Comments & Commit Messages: Concise English**:
+  - **Target Scope**: Source code files (`.ts`, `.js`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.), including identifiers (variable, function, class, type), inline comments (`//`, `#`, `/* */`), JSDoc/TSDoc annotations, docstrings, Git Conventional Commit messages (`feat(scope): concise summary`), and configuration keys.
+  - **Clarity & Brevity**: Use concise, professional, grammatical English. Explain the "why", business constraints, hardware invariants, and edge cases; never write redundant comments explaining self-evident syntax.
+  - **Strict Ban on Non-English in Code**: Code comments, docstrings, and commit messages must never contain Chinese or non-English characters.
 
 ---
 

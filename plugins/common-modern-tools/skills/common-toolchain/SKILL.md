@@ -349,15 +349,23 @@ To ensure high-efficiency human collaboration and maintain global code maintaina
 
 ### 7.1 Scope & Separation Matrix
 
-| Target Layer                                                                                         | Required Language                  | Tone & Style                                   | Prohibited Patterns                                                      |
-| :--------------------------------------------------------------------------------------------------- | :--------------------------------- | :--------------------------------------------- | :----------------------------------------------------------------------- |
-| **Human-Facing Docs** (`README.md`, `CHANGELOG.md`, design specs, incident postmortems, user guides) | **Traditional Chinese (繁體中文)** | Direct, concise, structured, empirical         | Emojis, fluff/filler, hyperbole, marketing buzzwords, Simplified Chinese |
-| **Agent Responses & Plans** (Conversational replies, `/plan`, `/boost`, walkthroughs)                | **Traditional Chinese (繁體中文)** | Direct, professional, technical                | Emojis, pleasantries, circular summaries, congratulatory remarks         |
-| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)                           | **Concise English**                | High-signal, explains constraints & "why"      | Emojis, Chinese comments, non-English text, restating obvious syntax     |
-| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                                   | **Concise English**                | Conventional Commits, imperative mood          | Emojis, Chinese text, vague messages (`fix bug`), verbose essays         |
-| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths)              | **Original Casing & Identifiers**  | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                                  |
+| Target Layer                                                                            | Required Language                                                                                                                                 | Tone & Style                                   | Prohibited Patterns                                                                           |
+| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **In-Repo Project Docs** (`README.md`, `CHANGELOG.md`, specs, API docs)                 | **Primary Document Language** (Preserve existing; default concise English for open-source/English projects; Traditional Chinese only if targeted) | Direct, concise, structured, empirical         | Language mixing, injecting Traditional Chinese into English docs, emojis, marketing buzzwords |
+| **Agent Dialogue & Meta-Artifacts** (Chat replies, `/plan`, `/boost`, `walkthrough.md`) | **Traditional Chinese (繁體中文)**                                                                                                                | Direct, professional, technical                | Emojis, pleasantries, circular summaries, congratulatory remarks                              |
+| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)              | **Concise English**                                                                                                                               | High-signal, explains constraints & "why"      | Emojis, Chinese comments, non-English text, restating obvious syntax                          |
+| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                      | **Concise English**                                                                                                                               | Conventional Commits, imperative mood          | Emojis, Chinese text, vague messages (`fix bug`), verbose essays                              |
+| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths) | **Original Casing & Identifiers**                                                                                                                 | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                                                       |
 
-### 7.2 Human-Facing Documentation: Anti-Patterns vs. Good Patterns
+### 7.2 Document Language Preservation & Human-Facing Documentation Patterns
+
+#### In-Place Modification Rule (Language Preservation)
+
+When editing or updating existing repository documentation (`README.md`, architectural specs, API documentation):
+
+- **Detect Source Language**: If the file is written in English, all edits and additions MUST be written in concise English.
+- **Zero Language Bleed**: NEVER inject Traditional Chinese or bilingual text into an existing English document.
+- **Traditional Chinese Projects & Meta-Artifacts**: When authoring documentation specifically targeted at Traditional Chinese readers, or when generating agent meta-artifacts in chat, strictly adhere to the concise, non-hyperbolic patterns below.
 
 #### Anti-Pattern (Hyperbolic, Fluffy & Low Signal)
 

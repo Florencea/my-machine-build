@@ -68,5 +68,6 @@ Prioritize `vpr` and native `vp` commands matching Antigravity's pre-approved ex
 
 ## 5. Language & Planning Standards
 
-- **Traditional Chinese for Plans & Responses**: All implementation plans (`/plan`), walkthrough artifacts, design documents, and chat responses must strictly be written in **Traditional Chinese (繁體中文)**.
+- **Language Invariant**: Implementation plans (`/plan`), walkthrough artifacts (`walkthrough.md`), and chat responses are written in **Traditional Chinese (繁體中文)**.
+- **Document Language Preservation**: In-repo documentation (e.g. `README.md`, architecture/design specs) must preserve the codebase's primary language (English by default). Never inject Traditional Chinese into English project documents.
 - **Code Artifacts**: Source code, inline comments, commit messages, and automated tests must use concise English.
