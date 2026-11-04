@@ -429,7 +429,7 @@ pbs.twimg.com -> CNAME pbs.twimg.com.cdn.cloudflare.net (Fast, at Taiwan)
 Windows PowerShell 5.1 defaults to `Restricted` execution policy on clean Windows installations. Run this one-liner in PowerShell to allow script execution:
 
 ```powershell
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force
 ```
 
 #### 2. Run Setup Script

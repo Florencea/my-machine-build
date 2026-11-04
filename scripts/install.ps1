@@ -18,22 +18,55 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
+# Ensure unprivileged ExecutionPolicy is set for current process and user
+if ((Get-ExecutionPolicy -Scope Process) -ne 'Bypass' -and (Get-ExecutionPolicy -Scope Process) -ne 'Unrestricted') {
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
+}
+if ((Get-ExecutionPolicy -Scope CurrentUser) -ne 'Unrestricted') {
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force -ErrorAction SilentlyContinue
+}
+
+# Resolve current script path reliably
+$currentScript = $PSCommandPath
+if ([string]::IsNullOrWhiteSpace($currentScript)) {
+    $currentScript = $MyInvocation.MyCommand.Definition
+}
+if ([string]::IsNullOrWhiteSpace($currentScript)) {
+    $currentScript = $MyInvocation.MyCommand.Path
+}
+
 # Self-elevation to Administrator if running under standard user
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host 'Administrator privileges required. Requesting elevation...' -ForegroundColor Yellow
-    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File `"$PSCommandPath`"" -Verb RunAs
+    $hostProcess = (Get-Process -Id $PID).Path
+    if ([string]::IsNullOrWhiteSpace($hostProcess) -or -not (Test-Path -LiteralPath $hostProcess)) {
+        $hostProcess = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+    }
+    $elevateArgs = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', $currentScript)
+    try {
+        $startParams = @{
+            FilePath         = $hostProcess
+            ArgumentList     = $elevateArgs
+            Verb             = 'RunAs'
+            WorkingDirectory = (Get-Location).Path
+        }
+        Start-Process @startParams
+    }
+    catch {
+        Write-Error "Elevation failed or was cancelled by user: $($_.Exception.Message)"
+    }
     exit
 }
 
-# Ensure persistent ExecutionPolicy for subsequent sessions and CLI utilities
-if ((Get-ExecutionPolicy -Scope CurrentUser) -in @('Restricted', 'Undefined')) {
-    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+# Ensure persistent ExecutionPolicy for machine and user levels
+if ((Get-ExecutionPolicy -Scope CurrentUser) -ne 'Unrestricted') {
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force
 }
-if ((Get-ExecutionPolicy -Scope LocalMachine) -in @('Restricted', 'Undefined')) {
-    Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
+if ((Get-ExecutionPolicy -Scope LocalMachine) -ne 'Unrestricted') {
+    Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Unrestricted -Force
 }
 
 # Enable Windows OS LongPaths support
@@ -351,6 +384,41 @@ function Initialize-Winget {
 }
 
 Initialize-Winget
+
+function Initialize-MicrosoftStore {
+    $existing = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host '      [OK] Microsoft Store is already installed.' -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Host '      [+] Microsoft Store not detected. Installing Microsoft Store...' -ForegroundColor Green
+    $installed = $false
+
+    if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
+        Write-Host '      Installing Microsoft Store via WinGet (msstore: 9WZDNCRFJBMP)...' -ForegroundColor DarkGray
+        & winget install --id 9WZDNCRFJBMP --source msstore --exact --accept-package-agreements --accept-source-agreements --disable-interactivity 2>$null
+        $check = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+        if ($check) {
+            $installed = $true
+        }
+    }
+
+    if (-not $installed -and (Get-Command 'wsreset.exe' -ErrorAction SilentlyContinue)) {
+        Write-Host '      Invoking wsreset.exe -i to register Microsoft Store...' -ForegroundColor DarkGray
+        Start-Process -FilePath 'wsreset.exe' -ArgumentList '-i' -Wait -NoNewWindow -ErrorAction SilentlyContinue
+    }
+
+    $finalCheck = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+    if ($finalCheck) {
+        Write-Host '      [OK] Microsoft Store installed successfully.' -ForegroundColor Green
+    }
+    else {
+        Write-Warning 'Microsoft Store installation initiated. It may take a few moments to finish background registration.'
+    }
+}
+
+Initialize-MicrosoftStore
 
 function Install-WingetIdempotent {
     param([string]$Id, [string]$Name)
