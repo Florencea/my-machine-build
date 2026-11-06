@@ -634,7 +634,7 @@ else {
 }
 
 # 7. PowerShell Profiles Setup ($PROFILE for PowerShell 7 and Windows PowerShell 5.1)
-Write-Output "[7/9] Setting up PowerShell Profile..."
+Write-Output '[7/9] Setting up PowerShell Profile...'
 
 $docsDir = [Environment]::GetFolderPath('MyDocuments')
 if (-not (Test-Path -LiteralPath $docsDir)) {
@@ -677,12 +677,36 @@ foreach ($pDir in $profileDirs) {
 }
 
 # Ensure PSScriptAnalyzer is installed for PowerShell static analysis
+# In Windows PowerShell 5.1, PowerShellGet requires NuGet provider (>= 2.8.5.201) to interact with PSGallery.
+# Bootstrapping NuGet provider silently with -Force prevents the interactive prompt.
+if ($PSVersionTable.PSEdition -ne 'Core') {
+    $hasNuGet = @(Get-PackageProvider -ListAvailable | Where-Object { $_.Name -eq 'NuGet' -and [Version]$_.Version -ge [Version]'2.8.5.201' })
+    if ($hasNuGet.Count -eq 0) {
+        try {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-Output "Warning: Failed to bootstrap NuGet package provider: $($_.Exception.Message)"
+        }
+    }
+}
+
 if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
     try {
         Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
     }
     catch {
         Write-Output "Warning: Failed to install PSScriptAnalyzer: $($_.Exception.Message)"
+    }
+}
+
+# Also ensure PSScriptAnalyzer is installed for PowerShell 7 (pwsh) when running under 5.1
+if ($PSVersionTable.PSEdition -ne 'Core' -and (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+    try {
+        pwsh -NoLogo -NoProfile -Command 'if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck }'
+    }
+    catch {
+        Write-Output "Warning: Failed to install PSScriptAnalyzer for PowerShell 7: $($_.Exception.Message)"
     }
 }
 
