@@ -40,10 +40,15 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host 'Administrator privileges required. Requesting elevation...' -ForegroundColor Yellow
+    Write-Output 'Administrator privileges required. Requesting elevation...'
     $hostProcess = (Get-Process -Id $PID).Path
     if ([string]::IsNullOrWhiteSpace($hostProcess) -or -not (Test-Path -LiteralPath $hostProcess)) {
-        $hostProcess = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            $hostProcess = 'pwsh.exe'
+        }
+        else {
+            $hostProcess = 'powershell.exe'
+        }
     }
     $elevateArgs = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', $currentScript)
     try {
@@ -105,14 +110,15 @@ else {
 }
 
 # Helper function to refresh PATH inside current process
-function Update-SessionPath {
+function Sync-SessionPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $combined = @(
         ($machinePath -split ';') + ($userPath -split ';') |
             ForEach-Object { $_.Trim() } |
-            Where-Object { $_ }
-    ) | Select-Object -Unique
+            Where-Object { $_ } |
+            Select-Object -Unique
+    )
 
     $extraPaths = @(
         (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'),
@@ -153,19 +159,19 @@ function Save-FileSecure {
     }
 }
 
-Write-Host '=== Starting Windows Modern Dev Environment Setup ===' -ForegroundColor Cyan
+Write-Output '=== Starting Windows Modern Dev Environment Setup ==='
 
 # 1. Workspace Directory Initialization
 if (-not (Test-Path -LiteralPath $workspaceDir)) {
-    Write-Host "[1/9] Creating Workspace Directory: $workspaceDir" -ForegroundColor Yellow
+    Write-Output "[1/9] Creating Workspace Directory: $workspaceDir"
     New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
 }
 else {
-    Write-Host "[1/9] Workspace Directory verified: $workspaceDir" -ForegroundColor DarkGray
+    Write-Output "[1/9] Workspace Directory verified: $workspaceDir"
 }
 
 # 2. Internal Root CAs (Private PKI for *.internal)
-Write-Host '[2/9] Checking & Trusting Internal Root CAs...' -ForegroundColor Cyan
+Write-Output '[2/9] Checking & Trusting Internal Root CAs...'
 
 $bhpdRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCRENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hRUkRFZU1Cd0dBMVVFQXd3VlFraFFSQ0JKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU1qRXdPVm9YRFRNMk1Ea3hOakUxTWpFd09Wb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJVUVReEhqQWNCZ05WQkFNTUZVSklVRVFnU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQk95elJsUngvMGR6SjBScDlkYTFiQmdCSmxMbFpqU0NmcFN6ZjBMcQpaeWRjeFo0c1NmWENuTyt4MUhZU1JEa3Y0RGlnYVZwckhaUE1OYldjQ1FsRnBsK2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZBZitMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQjhHQTFVZEl3UVlNQmFBRkFmKwpMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBjQU1FUUNJRmxqSXZKenIyWHJ5Y0FvYzgybVpjU2J3QzRPa1h3NExkQ3IKcU13SlpDWkRBaUJub2xGWjdLRUhtZWlUOU5xYUpmSEtSeW5rMzAwUDhSaDd1eDl2cWZIemNRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
 $bhgsRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCVENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hIVXpFZU1Cd0dBMVVFQXd3VlFraEhVeUJKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU5UUTBNbG9YRFRNMk1Ea3hOakUxTlRRME1sb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJUjFNeEhqQWNCZ05WQkFNTUZVSklSMU1nU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkZGOVk0d0N5TVNnbzNJSjU2QnZOaE12Mnh2a2Y4MC9id2dCOGhILwpFZHhzUktYTS91YjhBWTlldmxaR0VzQlpUZzJaS0ZIT0dMajBpNngyWldUanA3T2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZHMGU4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQjhHQTFVZEl3UVlNQmFBRkcwZQo4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBnQU1FVUNJUUNmd0JISXNaTVdHWUZEbVNFNHVuQlNlUUZidkZLMzU0NHUKQ1hadVYwRlhTd0lnR0hwRDVWMGN4RmluS2VtenJVMU1ZQklpZXB0SnVEVmFQSnVhK2Qya3JHST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
@@ -182,11 +188,11 @@ function Install-InternalRootCA {
     $inUser = @(Get-ChildItem Cert:\CurrentUser\Root -ErrorAction SilentlyContinue | Where-Object { $_.Thumbprint -eq $thumbprint })
     $inMachine = @(Get-ChildItem Cert:\LocalMachine\Root -ErrorAction SilentlyContinue | Where-Object { $_.Thumbprint -eq $thumbprint })
     if ($inUser.Count -gt 0 -or $inMachine.Count -gt 0) {
-        Write-Host "      [OK] $Name is already trusted." -ForegroundColor DarkGray
+        Write-Output "      [OK] $Name is already trusted."
         return
     }
 
-    Write-Host "      [+] Trusting $Name ($thumbprint)..." -ForegroundColor Green
+    Write-Output "      [+] Trusting $Name ($thumbprint)..."
 
     $storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
     $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', $storeLocation)
@@ -204,23 +210,30 @@ Install-InternalRootCA -Name 'BHGS Internal Root CA' -Base64Cert $bhgsRootCaB64
 
 # 3. Vite+ Home & Cache Relocation
 if ([Environment]::GetEnvironmentVariable('VP_HOME', 'User') -ne $vpHome) {
-    Write-Host "[3/9] Setting VP_HOME to $vpHome..." -ForegroundColor Yellow
+    Write-Output "[3/9] Setting VP_HOME to $vpHome..."
     [Environment]::SetEnvironmentVariable('VP_HOME', $vpHome, 'User')
     $env:VP_HOME = $vpHome
 }
 $env:VP_NODE_MANAGER = 'yes'
 $env:VP_PM_MANAGER = 'yes'
 if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
-    Write-Host '      Installing Vite+ toolchain...' -ForegroundColor Yellow
-    Invoke-RestMethod -Uri 'https://vite.plus/ps1' | Invoke-Expression
-    Update-SessionPath
+    Write-Output '      Installing Vite+ toolchain...'
+    $vpBootstrapScript = Join-Path $env:TEMP "vp-install-$(Get-Random).ps1"
+    Save-FileSecure -Uri 'https://vite.plus/ps1' -OutFile $vpBootstrapScript
+    try {
+        & $vpBootstrapScript
+    }
+    finally {
+        Remove-Item -LiteralPath $vpBootstrapScript -Force -ErrorAction SilentlyContinue
+    }
+    Sync-SessionPath
     if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
         & vp env default lts
         & vp env install lts
     }
 }
 else {
-    Write-Host '[3/9] Vite+ toolchain is ready.' -ForegroundColor DarkGray
+    Write-Output '[3/9] Vite+ toolchain is ready.'
 }
 
 # 4. WinGet Bootstrap & Package Installation
@@ -253,17 +266,17 @@ function Initialize-Winget {
         }
     }
 
-    Write-Host '      [+] WinGet not detected. Bootstrapping dependencies on Windows 10 LTSC...' -ForegroundColor Yellow
+    Write-Output '      [+] WinGet not detected. Bootstrapping dependencies on Windows 10 LTSC...'
 
     # Ensure AppX Deployment Service (AppXSvc) is enabled and running
     $appxSvc = Get-Service -Name 'AppXSvc' -ErrorAction SilentlyContinue
     if ($appxSvc) {
         if ($appxSvc.StartType -eq 'Disabled') {
-            Write-Host '      Enabling AppXSvc (AppX Deployment Service)...' -ForegroundColor DarkGray
+            Write-Output '      Enabling AppXSvc (AppX Deployment Service)...'
             Set-Service -Name 'AppXSvc' -StartupType Manual -ErrorAction SilentlyContinue
         }
         if ($appxSvc.Status -ne 'Running') {
-            Write-Host '      Starting AppXSvc service...' -ForegroundColor DarkGray
+            Write-Output '      Starting AppXSvc service...'
             Start-Service -Name 'AppXSvc' -ErrorAction SilentlyContinue
         }
     }
@@ -271,11 +284,16 @@ function Initialize-Winget {
     $tempDir = Join-Path $env:TEMP "winget-bootstrap-$(Get-Random)"
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
     try {
-        $arch = if ([IntPtr]::Size -eq 8) {
-            if ($env:PROCESSOR_ARCHITECTURE -match 'ARM64') { 'arm64' } else { 'x64' }
+        if ([IntPtr]::Size -eq 8) {
+            if ($env:PROCESSOR_ARCHITECTURE -match 'ARM64') {
+                $arch = 'arm64'
+            }
+            else {
+                $arch = 'x64'
+            }
         }
         else {
-            'x86'
+            $arch = 'x86'
         }
 
         # Modern WinGet (v1.28+) depends on VCLibs and Microsoft.WindowsAppRuntime.1.8.
@@ -289,10 +307,10 @@ function Initialize-Winget {
 
         New-Item -ItemType Directory -Force -Path $depsExtractDir | Out-Null
 
-        Write-Host '      Downloading WinGet dependencies archive (VCLibs & WindowsAppRuntime)...' -ForegroundColor DarkGray
+        Write-Output '      Downloading WinGet dependencies archive (VCLibs & WindowsAppRuntime)...'
         Save-FileSecure -Uri $depsUrl -OutFile $depsZipPath
 
-        Write-Host '      Extracting dependencies archive...' -ForegroundColor DarkGray
+        Write-Output '      Extracting dependencies archive...'
         $extracted = $false
         if (Get-Command 'tar.exe' -ErrorAction SilentlyContinue) {
             & tar.exe -xf $depsZipPath -C $depsExtractDir
@@ -304,7 +322,7 @@ function Initialize-Winget {
             Expand-Archive -Path $depsZipPath -DestinationPath $depsExtractDir -Force
         }
 
-        Write-Host '      Downloading WinGet DesktopAppInstaller package...' -ForegroundColor DarkGray
+        Write-Output '      Downloading WinGet DesktopAppInstaller package...'
         Save-FileSecure -Uri $wingetUrl -OutFile $wingetPath
 
         # Locate matching architecture dependencies (e.g. x64/ or arm64/)
@@ -314,9 +332,11 @@ function Initialize-Winget {
             $depFiles = @(Get-ChildItem -LiteralPath $targetArchDir -Filter '*.appx' | Sort-Object Name)
         }
         else {
-            $depFiles = @(Get-ChildItem -LiteralPath $depsExtractDir -Recurse -Filter '*.appx' |
-                Where-Object { $_.FullName -match $arch } |
-                Sort-Object Name)
+            $depFiles = @(
+                Get-ChildItem -LiteralPath $depsExtractDir -Recurse -Filter '*.appx' |
+                    Where-Object { $_.FullName -match $arch } |
+                    Sort-Object Name
+            )
         }
 
         if ($depFiles.Count -eq 0) {
@@ -324,19 +344,19 @@ function Initialize-Winget {
         }
 
         $depPaths = @()
-        Write-Host "      Registering framework dependencies ($arch)..." -ForegroundColor DarkGray
+        Write-Output "      Registering framework dependencies ($arch)..."
         foreach ($dep in $depFiles) {
-            Write-Host "        - Installing dependency: $($dep.Name)" -ForegroundColor DarkGray
+            Write-Output "        - Installing dependency: $($dep.Name)"
             try {
                 Add-AppxPackage -Path $dep.FullName -ErrorAction Stop
             }
             catch {
-                Write-Host "          [Note] $($_.Exception.Message.Trim())" -ForegroundColor DarkGray
+                Write-Output "          [Note] $($_.Exception.Message.Trim())"
             }
             $depPaths += $dep.FullName
         }
 
-        Write-Host '      Registering WinGet DesktopAppInstaller package...' -ForegroundColor DarkGray
+        Write-Output '      Registering WinGet DesktopAppInstaller package...'
         try {
             if ($depPaths.Count -gt 0) {
                 Add-AppxPackage -Path $wingetPath -DependencyPath $depPaths -ErrorAction Stop
@@ -346,7 +366,7 @@ function Initialize-Winget {
             }
         }
         catch {
-            Write-Host "      [!] Add-AppxPackage failed: $($_.Exception.Message). Falling back to Add-AppxProvisionedPackage..." -ForegroundColor Yellow
+            Write-Output "      [!] Add-AppxPackage failed: $($_.Exception.Message). Falling back to Add-AppxProvisionedPackage..."
             try {
                 if ($depPaths.Count -gt 0) {
                     Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -DependencyPackagePath $depPaths -SkipLicense -ErrorAction Stop | Out-Null
@@ -376,18 +396,18 @@ function Initialize-Winget {
             }
         }
 
-        Update-SessionPath
+        Sync-SessionPath
 
         if (-not (Get-Command 'winget' -ErrorAction SilentlyContinue)) {
             throw "WinGet installed successfully, but 'winget.exe' could not be located in PATH."
         }
 
-        Write-Host '      Initializing WinGet package source agreements...' -ForegroundColor DarkGray
+        Write-Output '      Initializing WinGet package source agreements...'
         & winget source update --disable-interactivity 2>$null | Out-Null
-        Write-Host '      [OK] WinGet bootstrapped successfully.' -ForegroundColor Green
+        Write-Output '      [OK] WinGet bootstrapped successfully.'
     }
     catch {
-        Write-Host "      [ERROR] WinGet bootstrap failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Output "      [ERROR] WinGet bootstrap failed: $($_.Exception.Message)"
         throw
     }
     finally {
@@ -402,15 +422,15 @@ Initialize-Winget
 function Initialize-MicrosoftStore {
     $existing = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
     if ($existing) {
-        Write-Host '      [OK] Microsoft Store is already installed.' -ForegroundColor DarkGray
+        Write-Output '      [OK] Microsoft Store is already installed.'
         return
     }
 
-    Write-Host '      [+] Microsoft Store not detected. Installing Microsoft Store...' -ForegroundColor Green
+    Write-Output '      [+] Microsoft Store not detected. Installing Microsoft Store...'
     $installed = $false
 
     if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
-        Write-Host '      Installing Microsoft Store via WinGet (msstore: 9WZDNCRFJBMP)...' -ForegroundColor DarkGray
+        Write-Output '      Installing Microsoft Store via WinGet (msstore: 9WZDNCRFJBMP)...'
         & winget install --id 9WZDNCRFJBMP --source msstore --exact --accept-package-agreements --accept-source-agreements --disable-interactivity 2>$null
         $check = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
         if ($check) {
@@ -419,13 +439,13 @@ function Initialize-MicrosoftStore {
     }
 
     if (-not $installed -and (Get-Command 'wsreset.exe' -ErrorAction SilentlyContinue)) {
-        Write-Host '      Invoking wsreset.exe -i to register Microsoft Store...' -ForegroundColor DarkGray
+        Write-Output '      Invoking wsreset.exe -i to register Microsoft Store...'
         Start-Process -FilePath 'wsreset.exe' -ArgumentList '-i' -Wait -NoNewWindow -ErrorAction SilentlyContinue
     }
 
     $finalCheck = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
     if ($finalCheck) {
-        Write-Host '      [OK] Microsoft Store installed successfully.' -ForegroundColor Green
+        Write-Output '      [OK] Microsoft Store installed successfully.'
     }
     else {
         Write-Warning 'Microsoft Store installation initiated. It may take a few moments to finish background registration.'
@@ -439,21 +459,21 @@ function Install-WingetIdempotent {
     if ($Id -eq 'AgileBits.1Password') {
         $check1P = & winget list 1Password --accept-source-agreements --disable-interactivity 2>$null
         if ($check1P -match '1Password') {
-            Write-Host "      [OK] $Name is already installed." -ForegroundColor DarkGray
+            Write-Output "      [OK] $Name is already installed."
             return
         }
     }
     $check = & winget list --id $Id -e --accept-source-agreements --disable-interactivity 2>$null
     if ($check -match [regex]::Escape($Id)) {
-        Write-Host "      [OK] $Name ($Id) is already installed." -ForegroundColor DarkGray
+        Write-Output "      [OK] $Name ($Id) is already installed."
     }
     else {
-        Write-Host "      [+] Installing $Name ($Id)..." -ForegroundColor Green
+        Write-Output "      [+] Installing $Name ($Id)..."
         & winget install --id $Id -e --accept-package-agreements --accept-source-agreements --disable-interactivity
     }
 }
 
-Write-Host '[4/9] Checking & Installing Modern CLI Tools and Desktop Apps...' -ForegroundColor Cyan
+Write-Output '[4/9] Checking & Installing Modern CLI Tools and Desktop Apps...'
 
 $cliPackages = @(
     @{ Id = 'Microsoft.PowerShell'; Name = 'PowerShell 7' },
@@ -499,10 +519,10 @@ foreach ($pkg in $desktopPackages) {
 & winget pin add --id Microsoft.Edge --blocking 2>$null | Out-Null
 
 # Refresh in-process PATH so git, pwsh, code etc. are immediately visible
-Update-SessionPath
+Sync-SessionPath
 
 # 5. Global Git Configuration & Pre-Commit Safety Hook
-Write-Host '[5/9] Configuring Global Git Settings & Pre-Commit Hook...' -ForegroundColor Cyan
+Write-Output '[5/9] Configuring Global Git Settings & Pre-Commit Hook...'
 $scriptDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent $scriptDir
 
@@ -515,7 +535,7 @@ $repoRoot = Split-Path -Parent $scriptDir
 
 $systemSsh = 'C:\Windows\System32\OpenSSH\ssh.exe'
 if (-not (Test-Path -LiteralPath $systemSsh)) {
-    Write-Host '      Checking OpenSSH Client Capability...' -ForegroundColor DarkGray
+    Write-Output '      Checking OpenSSH Client Capability...'
     try {
         Add-WindowsCapability -Online -Name 'OpenSSH.Client~~~~0.0.1.0' -ErrorAction Stop | Out-Null
     }
@@ -557,7 +577,7 @@ if (Test-Path -LiteralPath $srcPreCommit) {
 }
 
 # 6. Windows Terminal & VS Code Configuration
-Write-Host '[6/9] Configuring Terminal Defaults to PowerShell 7...' -ForegroundColor Cyan
+Write-Output '[6/9] Configuring Terminal Defaults to PowerShell 7...'
 
 $wtLocalState = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState'
 $wtSettings = Join-Path $wtLocalState 'settings.json'
@@ -582,7 +602,7 @@ if (Test-Path -LiteralPath $wtSettings) {
 }
 elseif (Test-Path -LiteralPath $wtLocalState) {
     $initialWt = @{
-        '$schema' = 'https://aka.ms/terminal-profiles-schema'
+        '$schema'      = 'https://aka.ms/terminal-profiles-schema'
         defaultProfile = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText($wtSettings, $initialWt, $utf8NoBom)
@@ -614,7 +634,7 @@ else {
 }
 
 # 7. PowerShell Profiles Setup ($PROFILE for PowerShell 7 and Windows PowerShell 5.1)
-Write-Host "[7/9] Setting up PowerShell Profile..." -ForegroundColor Cyan
+Write-Output "[7/9] Setting up PowerShell Profile..."
 
 $docsDir = [Environment]::GetFolderPath('MyDocuments')
 if (-not (Test-Path -LiteralPath $docsDir)) {
@@ -662,12 +682,12 @@ if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
         Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
     }
     catch {
-        Write-Host "Warning: Failed to install PSScriptAnalyzer: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Output "Warning: Failed to install PSScriptAnalyzer: $($_.Exception.Message)"
     }
 }
 
 # 8. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
-Write-Host '[8/9] Syncing Antigravity Plugins...' -ForegroundColor Cyan
+Write-Output '[8/9] Syncing Antigravity Plugins...'
 $pluginsDestRoot = Join-Path $HOME '.gemini\config\plugins'
 if (-not (Test-Path -LiteralPath $pluginsDestRoot)) {
     New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
@@ -694,7 +714,7 @@ foreach ($legacyDir in @('rules', 'skills')) {
 }
 
 # 9. Register Repository CLI Directory & Prune Stale User PATH
-Write-Host '[9/9] Registering CLI Directory and Pruning Stale User PATH Entries...' -ForegroundColor Cyan
+Write-Output '[9/9] Registering CLI Directory and Pruning Stale User PATH Entries...'
 $cliDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir '..\cli')).Path
 $rawUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $currentUserPath = @()
@@ -703,7 +723,9 @@ if ($rawUserPath) {
         $rawUserPath -split ';' |
             ForEach-Object { $_.Trim().TrimEnd('\') } |
             Where-Object {
-                if (-not $_) { return $false }
+                if (-not $_) {
+                    return $false
+                }
                 $expanded = [Environment]::ExpandEnvironmentVariables($_)
                 Test-Path -LiteralPath $expanded
             }
@@ -712,10 +734,10 @@ if ($rawUserPath) {
 
 if ($currentUserPath -notcontains $cliDir) {
     $currentUserPath += $cliDir
-    Write-Host "Added $cliDir to User PATH." -ForegroundColor Green
+    Write-Output "Added $cliDir to User PATH."
 }
 
 $cleanPath = ($currentUserPath | Select-Object -Unique) -join ';'
 [Environment]::SetEnvironmentVariable('Path', $cleanPath, 'User')
 
-Write-Host '=== Setup Completed Successfully! ===' -ForegroundColor Green
+Write-Output '=== Setup Completed Successfully! ==='
