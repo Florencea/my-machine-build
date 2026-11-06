@@ -105,7 +105,7 @@ foreach ($cmd in @('ffmpeg', 'ffprobe')) {
     }
 }
 
-function Convert-TimeToSeconds {
+function Convert-TimeToSecond {
     param([string]$TimeStr)
     if ($TimeStr -match '^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)$') {
         return [double]$Matches[1] * 3600 + [double]$Matches[2] * 60 + [double]$Matches[3]
@@ -133,8 +133,8 @@ try {
             exit 1
         }
 
-        $startSec = Convert-TimeToSeconds -TimeStr $Start
-        $durSec = Convert-TimeToSeconds -TimeStr $Duration
+        $startSec = Convert-TimeToSecond -TimeStr $Start
+        $durSec = Convert-TimeToSecond -TimeStr $Duration
         $endSec = $startSec + $durSec
         $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'edge')
 

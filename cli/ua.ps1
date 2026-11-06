@@ -34,10 +34,18 @@ foreach ($rawArg in $args) {
         Show-Help
         exit 0
     }
-    elseif ($arg -match '^--?skip-?brew$') { $SkipBrew = $true }
-    elseif ($arg -match '^--?skip-?winget$') { $SkipWinget = $true }
-    elseif ($arg -match '^--?skip-?vite$') { $SkipVite = $true }
-    elseif ($arg -match '^--?skip-?git$') { $SkipGit = $true }
+    elseif ($arg -match '^--?skip-?brew$') {
+        $SkipBrew = $true
+    }
+    elseif ($arg -match '^--?skip-?winget$') {
+        $SkipWinget = $true
+    }
+    elseif ($arg -match '^--?skip-?vite$') {
+        $SkipVite = $true
+    }
+    elseif ($arg -match '^--?skip-?git$') {
+        $SkipGit = $true
+    }
 }
 
 function Get-ScriptDirectory {

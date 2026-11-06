@@ -654,9 +654,12 @@ $env:FORCE_COLOR = '3'
 if (Get-Module -ListAvailable -Name PSReadLine) {
     try {
         Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
-        Set-PSReadLineKeyHandler -Key "Shift+Tab" -Function TabCompletePrevious
+        Set-PSReadLineKeyHandler -Key 'Shift+Tab' -Function TabCompletePrevious
         Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView -ErrorAction Stop
-    } catch {}
+    }
+    catch {
+        Write-Verbose "PSReadLine configuration skipped: $($_.Exception.Message)"
+    }
 }
 '@
 

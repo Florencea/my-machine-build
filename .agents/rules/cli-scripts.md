@@ -50,16 +50,23 @@ description: Rules for managing, authoring, and verifying cross-platform PowerSh
 
 ## 4. Cross-Platform Formatting, Static Analysis & AST Syntax Verification
 
+- **Pre-Execution Live Documentation & Introspection Gate**:
+  - Before using unfamiliar cmdlets or `.NET` methods in `cli/*.ps1`, verify parameter sets and method overloads via `pwsh -NoLogo -NoProfile -Command "Get-Command <Cmdlet> -Syntax"`, `[Namespace.Type].GetMethods()`, or `webread` on Microsoft Learn official documentation.
+  - Always pass `-LiteralPath` (never `-Path`) to file cmdlets (`Test-Path`, `Get-Item`, `Get-ChildItem`, `Get-Content`, `Copy-Item`, `Move-Item`, `Remove-Item`, `Resolve-Path`) unless wildcard globbing is explicitly required, and pass resolved absolute paths to `.NET` `[System.IO.File]` methods.
 - **Formatting (`PSScriptAnalyzer` / VS Code Parity)**:
-  - Format all `.ps1` scripts using `Invoke-Formatter` with `PSScriptAnalyzerSettings.psd1` (matching VS Code global settings: `Stroustrup` style, 4-space indent, aligned hashtables, single-quoted constant strings, LF `\n` line endings, and UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang works identically across macOS and Windows 11).
-- **Static Analysis Gate (`Invoke-ScriptAnalyzer`)**:
-  - Before staging any `cli/*.ps1` changes, run static analysis and achieve **0 Errors, 0 Warnings**:
-    ```bash
-    pwsh -NoLogo -NoProfile -Command "Invoke-ScriptAnalyzer -Path 'cli/<command>.ps1' -Settings './PSScriptAnalyzerSettings.psd1'"
+  - Format all `.ps1` scripts using `Invoke-Formatter` with `PSScriptAnalyzerSettings.psd1` (matching VS Code global settings: `Stroustrup` style, `IgnoreOneLineBlock = $false`, 4-space indent, aligned hashtables, single-quoted constant strings), explicitly normalizing CRLF (`\r\n`) to LF (`\n`) and writing UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang works identically across macOS and Windows 11:
+    ```powershell
+    pwsh -NoLogo -NoProfile -Command "`$p = (Resolve-Path -LiteralPath 'cli/<command>.ps1').Path; `$raw = [System.IO.File]::ReadAllText(`$p); `$fmt = Invoke-Formatter -ScriptDefinition `$raw -Settings ./PSScriptAnalyzerSettings.psd1; `$clean = (`$fmt -replace \"`r`n\", \"`n\").TrimEnd() + \"`n\"; [System.IO.File]::WriteAllText(`$p, `$clean, [System.Text.UTF8Encoding]::new(`$false))"
     ```
-  - Eliminate all cmdlet aliases (`select`, `where`, `dir`, `echo`, `gc`), empty catch blocks, uninitialized parallel runspace variables (`$using:`), and unapproved verbs.
 - **AST Syntax Verification**:
   - Verify zero syntax errors using the PowerShell language parser:
-    ```bash
-    pwsh -NoLogo -NoProfile -Command '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("cli/<command>.ps1", [ref]$null, [ref]$errors); if ($errors) { $errors; exit 1 }'
+    ```powershell
+    pwsh -NoLogo -NoProfile -Command '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath "cli/<command>.ps1").Path, [ref]$null, [ref]$errors); if ($errors) { $errors; exit 1 }'
     ```
+- **Non-Bypassable Static Analysis Gate (`Invoke-ScriptAnalyzer -IncludeSuppressed`)**:
+  - Before staging any `cli/*.ps1` changes, run static analysis with `-IncludeSuppressed` and achieve **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**:
+    ```powershell
+    pwsh -NoLogo -NoProfile -Command "`$res = @(Invoke-ScriptAnalyzer -Path 'cli/<command>.ps1' -Settings './PSScriptAnalyzerSettings.psd1' -IncludeSuppressed); if (`$res.Count -gt 0) { `$res | Format-Table -AutoSize; exit 1 }"
+    ```
+  - Strictly prohibited to add `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]`, pass `-ExcludeRule`, or weaken `PSScriptAnalyzerSettings.psd1`.
+  - Eliminate all cmdlet aliases (`select`, `where`, `dir`, `echo`, `gc`), empty catch blocks, `Write-Host` calls (use `Write-Output`, `[Console]::Error.WriteLine`, or `$Host.UI.Write` for terminal spinners, noting that `PSAvoidUsingWriteHost` also forbids `[Console]::Write`), single-line brace blocks, plural function nouns, uninitialized parallel runspace variables (`$using:`), and unapproved verbs.

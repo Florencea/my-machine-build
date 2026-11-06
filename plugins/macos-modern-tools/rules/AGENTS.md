@@ -186,10 +186,16 @@ macOS Darwin uses FreeBSD-derived userland utilities. Agents MUST observe the fo
 
 ---
 
-## 10. PowerShell 7 (`pwsh`) Symlink Execution on macOS
+## 10. PowerShell 7 (`pwsh`) Authoring, Verification & Symlink Execution on macOS
 
 - **Extensionless Symlink Path Resolution**:
   - Cross-platform CLI scripts (`cli/*.ps1`) are symlinked into `~/.local/bin/<cmd>` without extension.
   - When `pwsh` runs an extensionless symlink via shebang, PowerShell runs it as an anonymous `ScriptBlock` where `$PSScriptRoot` and `$PSCommandPath` are empty string (`""`).
   - Furthermore, `~/.local/bin/<cmd>` points to `cli/<cmd>.ps1`.
   - Any script resolving repository-relative paths MUST inspect `[Environment]::GetCommandLineArgs()` and use `[System.IO.FileInfo]::new(...).ResolveLinkTarget($true)` to resolve the real script directory.
+- **Unix Environment Case Sensitivity & Path Invariants**:
+  - On Darwin, environment variable names are strictly case-sensitive (`$env:PATH` is populated, whereas `$env:Path` is `$null`). Always use `$env:PATH`, `Join-Path`, `-LiteralPath`, and `[System.IO.Path]::PathSeparator` (`:`).
+  - Guard Windows-only APIs such as `[Environment]::GetEnvironmentVariable('Path', 'User')` with `if ($IsWindows)`.
+- **Mandatory 3-Stage Formatting, AST & Non-Bypassable Lint Gate**:
+  - Every modified `.ps1`, `.psm1`, or `.psd1` file MUST be formatted with `Invoke-Formatter` (normalized to LF `\n` and UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang executes cleanly on Darwin), checked via `[System.Management.Automation.Language.Parser]::ParseFile(...)`, and verified with `Invoke-ScriptAnalyzer -Path <file> -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed` achieving **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
+  - STRICTLY PROHIBITED to add `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]`, pass `-ExcludeRule`, or weaken `PSScriptAnalyzerSettings.psd1`.

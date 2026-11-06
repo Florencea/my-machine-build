@@ -247,7 +247,7 @@ export function parseWebContent(input: string, options: ParseOptions = {}): stri
     (/\.(txt|md)($|\?)/i.test(options.url) || /\/llms(-full)?\.txt/i.test(options.url));
   const hasHtmlPreamble =
     /^\s*<!doctype\s+html/i.test(processed) || /<html\b[^>]*>/i.test(processed.slice(0, 2048));
-  const isHtml = !isTxtOrMd && hasHtmlPreamble;
+  const isHtml = hasHtmlPreamble || !isTxtOrMd;
 
   if (isHtml && options.raw !== true) {
     const mainSection = extractMainContent(processed, options.selector);

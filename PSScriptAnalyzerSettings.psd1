@@ -1,27 +1,31 @@
 @{
-    Severity            = @('Error', 'Warning')
+    Severity            = @('ParseError', 'Error', 'Warning', 'Information')
     IncludeDefaultRules = $true
-    ExcludeRules        = @('PSUseBOMForUnicodeEncodedFile')
+    ExcludeRules        = @(
+        'PSUseBOMForUnicodeEncodedFile',
+        'PSAvoidUsingPositionalParameters',
+        'PSProvideCommentHelp'
+    )
 
     Rules               = @{
-        PSPlaceOpenBrace                          = @{
+        PSPlaceOpenBrace                             = @{
             Enable             = $true
             OnSameLine         = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
         }
-        PSPlaceCloseBrace                         = @{
+        PSPlaceCloseBrace                            = @{
             Enable             = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
         }
-        PSUseConsistentIndentation                = @{
+        PSUseConsistentIndentation                   = @{
             Enable              = $true
             Kind                = 'space'
             IndentationSize     = 4
             PipelineIndentation = 0
         }
-        PSUseConsistentWhitespace                 = @{
+        PSUseConsistentWhitespace                    = @{
             Enable                                  = $true
             CheckOpenBrace                          = $true
             CheckOpenParen                          = $true
@@ -33,17 +37,23 @@
             CheckPipeForRedundantWhitespace         = $true
             IgnoreAssignmentOperatorInsideHashTable = $true
         }
-        PSAlignAssignmentStatement                = @{
+        PSAlignAssignmentStatement                   = @{
             Enable         = $true
             CheckHashtable = $true
         }
-        PSAvoidUsingDoubleQuotesForConstantString = @{
+        PSAvoidUsingDoubleQuotesForConstantString    = @{
             Enable = $true
         }
-        PSAvoidSemicolonsAsLineTerminators        = @{
+        PSAvoidSemicolonsAsLineTerminators           = @{
             Enable = $true
         }
-        PSUseCorrectCasing                        = @{
+        PSUseCorrectCasing                           = @{
+            Enable = $true
+        }
+        PSAvoidTrailingWhitespace                    = @{
+            Enable = $true
+        }
+        PSPossibleIncorrectUsageOfAssignmentOperator = @{
             Enable = $true
         }
     }

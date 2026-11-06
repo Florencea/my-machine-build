@@ -117,7 +117,7 @@ if (-not (Get-Command 'ffmpeg' -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-function Convert-TimeToSeconds {
+function Convert-TimeToSecond {
     param([string]$TimeStr)
     if ($TimeStr -match '^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)$') {
         return [double]$Matches[1] * 3600 + [double]$Matches[2] * 60 + [double]$Matches[3]
@@ -145,8 +145,8 @@ try {
             exit 1
         }
 
-        $startSec = Convert-TimeToSeconds -TimeStr $Start
-        $durSec = Convert-TimeToSeconds -TimeStr $Duration
+        $startSec = Convert-TimeToSecond -TimeStr $Start
+        $durSec = Convert-TimeToSecond -TimeStr $Duration
         $endSec = $startSec + $durSec
         $ytHeight = ($Width -le 480) ? 480 : (($Width -le 720) ? 720 : (($Width -le 1280) ? 1080 : 2160))
         $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'edge')
@@ -195,14 +195,27 @@ try {
     if ($gifskiCmd) {
         if ($IsWindows) {
             try {
-                $bytes = [System.IO.File]::ReadAllBytes($gifskiCmd.Source)
-                $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
-                $subsystem = [BitConverter]::ToUInt16($bytes, $peOffset + 0x5C)
-                if ($subsystem -eq 3) {
-                    $hasGifskiCli = $true
+                $fs = [System.IO.File]::OpenRead($gifskiCmd.Source)
+                try {
+                    $headerBuf = [byte[]]::new(4096)
+                    $bytesRead = $fs.Read($headerBuf, 0, $headerBuf.Length)
+                    if ($bytesRead -ge 0x40) {
+                        $peOffset = [BitConverter]::ToInt32($headerBuf, 0x3C)
+                        if (($peOffset + 0x5E) -le $bytesRead) {
+                            $subsystem = [BitConverter]::ToUInt16($headerBuf, $peOffset + 0x5C)
+                            if ($subsystem -eq 3) {
+                                $hasGifskiCli = $true
+                            }
+                        }
+                    }
+                }
+                finally {
+                    $fs.Dispose()
                 }
             }
-            catch {}
+            catch {
+                Write-Verbose "PE header inspection skipped for gifski: $($_.Exception.Message)"
+            }
         }
         else {
             $hasGifskiCli = $true

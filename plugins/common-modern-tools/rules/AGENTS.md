@@ -43,6 +43,9 @@
   - NEVER compose `ffmpeg` filtergraphs (`-filter_complex`, `-vf`), stream mappings (`-map`), or codec flags from memory. Always verify with `ffmpeg -h filter=<name>`.
   - NEVER invoke `yt-dlp` stream extraction or section download arguments (`--download-sections`, `--cookies-from-browser`, `-f`) without verifying options first via `yt-dlp --help`.
   - Guessing arguments for multimedia CLI tools is strictly prohibited and immediately treated as a protocol violation.
+- **PowerShell, .NET BCL & PSScriptAnalyzer Live Verification Mandate**:
+  - NEVER guess cmdlet parameter names/sets, `.NET` method overloads (which diverge between `.NET Framework 4.x` in PS 5.1 and `.NET 8+` in PS 7+), or `PSScriptAnalyzer` rule settings from memory.
+  - Prior to authoring or refactoring PowerShell code (`*.ps1`, `*.psm1`, `*.psd1`), inspect runtime signatures via `pwsh -NoLogo -NoProfile -Command "Get-Command <Cmdlet> -Syntax"`, `[Namespace.Type].GetMethods()`, or `Get-ScriptAnalyzerRule -Name <Rule>`, and consult official Microsoft Learn docs via `webread` (`https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell`, `https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/using-scriptanalyzer`).
 - **No Fragile Version Pinning**:
   - NEVER hardcode minor/patch versions or assume fixed runtime versions from memory.
   - Dynamically inspect `package.json` (`engines.node`, `dependencies`) or `<tool> --version`.
@@ -89,7 +92,14 @@
 - **Immediate Formatting After File Edits**:
   - Whenever you create or modify Markdown (`*.md`), JSON (`*.json`), or TypeScript/web code files via file tools (`edit_file`, `write_file`, `sd`), you MUST immediately format those files using `vpx oxfmt <files>` before taking any further action, running checks, or responding to the user.
   - Shell scripts (`*.sh`, `*.zsh`, `*.bash`): Format with `shfmt -i 2 -ci -w <files>`.
-  - PowerShell scripts (`*.ps1`, `*.psm1`): Format using `Invoke-Formatter` and verify static analysis via `Invoke-ScriptAnalyzer` against `PSScriptAnalyzerSettings.psd1` (matching VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM with zero warnings).
+  - PowerShell scripts (`*.ps1`, `*.psm1`, `*.psd1`): Execute the mandatory 3-stage PowerShell verification pipeline against `PSScriptAnalyzerSettings.psd1` (or fallback `$HOME/.gemini/config/plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1`):
+    1. **Formatting & LF Normalization**: Format via `Invoke-Formatter`, explicitly normalize CRLF to LF (`($formatted -replace "`r`n", "`n").TrimEnd() + "`n"`), and write as UTF-8 without BOM (`[System.Text.UTF8Encoding]::new($false)`).
+    2. **AST Grammar & Cross-Version Syntax Check**: Verify zero parse errors via `[System.Management.Automation.Language.Parser]::ParseFile(...)`. For dual-version bootstrap scripts (`#Requires -Version 5.1` such as `scripts/install.ps1`), also verify `PSUseCompatibleSyntax` with `TargetVersions = @('5.1', '7.4')`.
+    3. **Non-Bypassable Static Analysis (`-IncludeSuppressed`)**: Run `Invoke-ScriptAnalyzer -Path <file> -Settings <settings.psd1> -IncludeSuppressed` and achieve **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
+- **Zero Lint Suppression & Zero Bypass Policy (PowerShell & TypeScript)**:
+  - STRICTLY PROHIBITED to add `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]` or `[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]` in any PowerShell file, or `@ts-ignore` / `oxlint-disable` in TypeScript.
+  - STRICTLY PROHIBITED to pass `-ExcludeRule`, narrow `-Severity`, or modify `PSScriptAnalyzerSettings.psd1` to disable or weaken rules.
+  - Never use `Write-Host` (PSScriptAnalyzer's `PSAvoidUsingWriteHost` also forbids `[Console]::Write` and `[Console]::WriteLine`; use `Write-Output` for stdout, `[Console]::Error.WriteLine` for stderr, or `$Host.UI.Write` for in-place terminal spinners/ANSI animations).
 - **Zero Unformatted or Unverified Files Policy**:
   - Never leave modified Markdown, JSON, Shell, or PowerShell files unformatted or failing static analysis on disk.
 
@@ -112,8 +122,13 @@
 - **Path Concatenation & Resolution (Zero String Concatenation)**:
   - NEVER concatenate filesystem paths using manual string addition (`dir + '/' + file` or `dir + '\\' + file`).
   - In Node.js / TypeScript: ALWAYS use `node:path` methods (`path.join()`, `path.resolve()`, `path.relative()`).
-  - In PowerShell: ALWAYS use `Join-Path` or `[System.IO.Path]::Combine()`.
+  - In PowerShell: ALWAYS use `Join-Path`, `Split-Path`, or `[System.IO.Path]::Combine()`. Pass `-LiteralPath` (never `-Path`) to file cmdlets (`Test-Path`, `Get-Item`, `Get-ChildItem`, `Get-Content`, `Copy-Item`, `Move-Item`, `Remove-Item`, `Resolve-Path`) unless wildcard expansion is explicitly required, preventing `[` and `]` bracket globbing failures.
   - In Zsh / Shell: ALWAYS use native parameter modifiers (`${dir}/${file}`, `${file:A}`) and avoid assuming fixed path formats.
+- **Cross-Platform & Cross-Version PowerShell Portability Invariants**:
+  - **`.NET` Working Directory Desync Guard**: `.NET` static methods (`[System.IO.File]::ReadAllText`, `WriteAllText`, `[System.IO.FileInfo]::new`) resolve relative paths against `[System.Environment]::CurrentDirectory`, NOT PowerShell's `$PWD`. Always pass resolved absolute paths (`(Resolve-Path -LiteralPath $p).Path` or `Join-Path $PWD.ProviderPath $relPath`) to `.NET` APIs.
+  - **PS 5.1 vs PS 7+ Compatibility Boundaries**: In dual-version scripts (`#Requires -Version 5.1`), never use PS 7-only operators (`? :`, `??`, `??=`, `?.`, `&&`, `||`), `ForEach-Object -Parallel`, or `ConvertFrom-Json -AsHashtable`. Guard `$IsWindows` / `$IsMacOS` / `$IsLinux` with `($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows` (since `$IsWindows` is undefined in PS 5.1 and throws under `Set-StrictMode -Version Latest`).
+  - **`String.Split` Overload Safety**: Never call `$str.Split('ab')` with a multi-character string (`.NET Framework 4.x` splits by `char[]`, whereas `.NET 8+` splits by substring). Always use the PowerShell `-split` operator or explicit `[char[]]` cast (`$str.Split([char[]]'ab')`).
+  - **Unix Case-Sensitive Environment & `PATH` Delimiter**: On macOS/Linux, environment variables are case-sensitive (`$env:PATH`, never `$env:Path`), `PATH` uses `[System.IO.Path]::PathSeparator` (`:` vs `;`), and `[Environment]::GetEnvironmentVariable(..., 'User')` must be guarded by `if ($IsWindows)`. Wrap pipeline filter results in `@(...)` before indexing `[0]` or checking `.Count`.
 - **Glob Patterns POSIX Forward-Slash Invariant**:
   - In all file glob patterns (`node:fs/promises` `glob`, `fast-glob`, `knip.json`, Vite `ignorePatterns`, `fd`), ALWAYS use POSIX forward slashes `/`.
   - On Windows, backslashes `\` are interpreted as escape characters in glob syntax, causing file matching to fail silently or throw errors. If a path was produced by `path.join`, normalize it before globbing: `pattern.replace(/\\/g, '/')`.

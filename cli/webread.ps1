@@ -53,7 +53,9 @@ if (-not $realScriptDir) {
             if ($item) {
                 if ($item.LinkType) {
                     $target = $item.ResolveLinkTarget($true)
-                    if ($target) { $realScriptDir = $target.DirectoryName }
+                    if ($target) {
+                        $realScriptDir = $target.DirectoryName
+                    }
                 }
                 else {
                     $realScriptDir = $item.DirectoryName
@@ -61,7 +63,9 @@ if (-not $realScriptDir) {
             }
         }
     }
-    catch {}
+    catch {
+        Write-Verbose "Failed to resolve symlink script root: $($_.Exception.Message)"
+    }
 }
 if (-not $realScriptDir) {
     $realScriptDir = [System.IO.Path]::GetDirectoryName((Get-Process -Id $PID).Path)

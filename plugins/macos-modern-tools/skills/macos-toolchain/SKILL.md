@@ -329,10 +329,12 @@ Default handler registration without GUI confirmation dialogs:
 
 ## 13. Cross-Platform PowerShell 7 CLI Scripts on Darwin
 
-- Cross-platform CLI tools in `cli/*.ps1` use `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` and are symlinked without extension into `~/.local/bin`.
+- Refer to the **`modern-powershell`** skill for complete cross-platform and cross-version rules.
+- Cross-platform CLI tools in `cli/*.ps1` use `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` (must be saved with LF `\n` and UTF-8 without BOM) and are symlinked without extension into `~/.local/bin`.
 - Ensure physical script paths are resolved via `ResolveLinkTarget($true)`:
   ```powershell
   $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
   $targetInfo = $fileInfo.ResolveLinkTarget($true)
   $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
   ```
+- After editing any `.ps1`, `.psm1`, or `.psd1` file on macOS, always run `Invoke-Formatter` (normalized to LF and UTF-8 without BOM), `Parser::ParseFile` AST check, and `Invoke-ScriptAnalyzer -Path <file> -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed` with zero violations and zero `SuppressMessageAttribute` usage.

@@ -71,10 +71,14 @@ function Invoke-Step {
     $prevLog = $env:VP_LOG
     $env:VP_LOG = 'error'
 
+    $targetExe = $Exe
+    $targetArgs = $Arguments
+
     $job = Start-ThreadJob -ScriptBlock {
-        param($cmdExe, [string[]]$cmdArgs)
+        $runExe = $using:targetExe
+        $runArgs = $using:targetArgs
         try {
-            $output = @(& $cmdExe @cmdArgs 2>&1)
+            $output = @(& $runExe @runArgs 2>&1)
             [PSCustomObject]@{
                 Output   = $output
                 ExitCode = ($LASTEXITCODE ?? 0)
@@ -86,14 +90,14 @@ function Invoke-Step {
                 ExitCode = 1
             }
         }
-    } -ArgumentList @($Exe, $Arguments)
+    }
 
     try {
-        Write-Host -NoNewline "`e[?25l`r  $($frames[$frameIdx]) $Message..."
+        $Host.UI.Write("`e[?25l`r  $($frames[$frameIdx]) $Message...")
         $frameIdx = ($frameIdx + 1) % $frames.Count
 
         while (-not $job.Finished.WaitOne(80)) {
-            Write-Host -NoNewline "`r  $($frames[$frameIdx]) $Message..."
+            $Host.UI.Write("`r  $($frames[$frameIdx]) $Message...")
             $frameIdx = ($frameIdx + 1) % $frames.Count
         }
 
@@ -110,7 +114,7 @@ function Invoke-Step {
             $output = @("Step '$Message' terminated unexpectedly.")
         }
 
-        Write-Host -NoNewline "`r`e[K"
+        $Host.UI.Write("`r`e[K")
         if ($code -ne 0) {
             foreach ($line in $output) {
                 [Console]::Error.WriteLine($line)
@@ -119,7 +123,7 @@ function Invoke-Step {
         }
     }
     finally {
-        Write-Host -NoNewline "`e[?25h"
+        $Host.UI.Write("`e[?25h")
         if ($null -ne $job) {
             if ($job.JobStateInfo.State -eq [System.Management.Automation.JobState]::Running) {
                 Stop-Job -Job $job -Force -ErrorAction SilentlyContinue
@@ -305,7 +309,7 @@ try {
     }
 }
 catch {
-    Write-Host -NoNewline "`r`e[K"
+    $Host.UI.Write("`r`e[K")
     [Console]::Error.WriteLine("Error: Pre-checks failed at step '$failedStep'. Rolling back changes to 'main'...")
     & git checkout -q main 2>$null
     & git branch -D $tempBranch >$null 2>&1

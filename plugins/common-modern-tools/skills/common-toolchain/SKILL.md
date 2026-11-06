@@ -44,7 +44,7 @@ Always prefer high-performance single-purpose CLI binaries for instant execution
 - **Formatting & Static Analysis**:
   - Shell scripts (`.sh`, `.zsh`, `.bash`) $\rightarrow$ `shfmt -i 2 -ci -w <file>`.
   - Markdown, JSON & code files $\rightarrow$ `vpx oxfmt <file>`.
-  - PowerShell scripts (`.ps1`, `.psm1`) $\rightarrow$ `Invoke-Formatter` and `Invoke-ScriptAnalyzer -Settings ./PSScriptAnalyzerSettings.psd1` (matching VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM).
+  - PowerShell scripts (`.ps1`, `.psm1`, `.psd1`) $\rightarrow$ `Invoke-Formatter` (with CRLF-to-LF normalization and UTF-8 without BOM), `Parser::ParseFile` AST check, and `Invoke-ScriptAnalyzer -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed` (see the **`modern-powershell`** skill for complete cross-platform and cross-version rules).
 - **CI/CD Workflow Static Analysis (`actionlint`)**:
   - Lint GitHub Actions workflows $\rightarrow$ `actionlint` (verifies syntax, runner directives, expression syntax).
 - **Execution Benchmarking (`hyperfine`)**:
@@ -222,12 +222,17 @@ Agents MUST actively inspect official documentation or run `<tool> --help` befor
 - **Oxc (`oxfmt`, `oxlint`)**:
   - LLM Reference: `webread --llms https://oxc.rs` (or `https://oxc.rs/llms.txt`)
   - CLI Help: `vpx oxlint --help`, `vpx oxfmt --help`
-- **PowerShell 7 (`pwsh`)**:
-  - Syntax Outline: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
-  - Official Reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
+- **PowerShell 7 (`pwsh`) & Windows PowerShell 5.1 (`powershell.exe`)**:
+  - Dedicated Skill: Refer to **`modern-powershell`** for cross-platform/cross-version authoring and the 3-stage verification pipeline.
+  - Runtime Introspection: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"` and `[Namespace.Type].GetMethods()`.
+  - Official PS 5.1 vs 7+ Differences: `webread https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell`
+  - Official Cross-Platform Guide: `webread https://learn.microsoft.com/en-us/powershell/scripting/dev-cross-plat/writing-portable-modules`
+  - Official Language Reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
 - **PSScriptAnalyzer (`Invoke-ScriptAnalyzer`, `Invoke-Formatter`)**:
-  - Official Reference: `webread https://github.com/PowerShell/PSScriptAnalyzer`
-  - Workspace Settings: `PSScriptAnalyzerSettings.psd1` (aligns with VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM)
+  - Official Usage & Rules: `webread https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/using-scriptanalyzer`
+  - Syntax Compatibility (`PSUseCompatibleSyntax`): `webread https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/rules/usecompatiblesyntax`
+  - Rule Introspection: `pwsh -NoLogo -NoProfile -Command "Get-ScriptAnalyzerRule -Name <RuleName> | Format-List *"`
+  - Workspace Settings: `PSScriptAnalyzerSettings.psd1` (`Severity = @('ParseError', 'Error', 'Warning', 'Information')`, VS Code `Stroustrup` style, 4-space indentation, LF, UTF-8 without BOM; always run with `-IncludeSuppressed`)
 - **Node.js (Active LTS)**:
   - Built-in APIs: Query local type declarations or inspect `https://nodejs.org/api/`
 

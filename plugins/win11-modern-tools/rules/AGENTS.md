@@ -127,30 +127,33 @@
 ## 8. Mandatory PowerShell Script Quality Gate & VS Code Formatter Alignment
 
 - **Post-Edit Verification & Formatting Invariant**:
-  - Whenever you create, modify, or refactor any PowerShell script (`*.ps1`, `*.psm1`, `*.psd1`), you MUST execute static analysis and formatting using `PSScriptAnalyzer` before taking further actions, staging changes, or concluding the task.
-  - Verification must achieve **0 Errors and 0 Warnings** against `PSScriptAnalyzerSettings.psd1`.
+  - Whenever you create, modify, or refactor any PowerShell script (`*.ps1`, `*.psm1`, `*.psd1`), you MUST execute formatting, AST grammar check, and static analysis using `PSScriptAnalyzer` before taking further actions, staging changes, or concluding the task.
+  - Verification must achieve **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations** against `PSScriptAnalyzerSettings.psd1` with `-IncludeSuppressed`.
 - **VS Code Global Formatting Parity**:
   - Code formatting must strictly adhere to the user's VS Code configuration:
-    - **Preset**: `Stroustrup` style (opening brace `{` on the same line as statements, closing brace `}` on a separate line).
+    - **Preset**: `Stroustrup` style (opening brace `{` on the same line as statements, closing brace `}` on a separate line, `IgnoreOneLineBlock = $false` — single-line `{ ... }` control blocks are prohibited).
     - **Indentation**: 4 spaces (`Kind = 'space'`, `IndentationSize = 4`, `PipelineIndentation = 0`). Tabs are prohibited.
-    - **Line Endings & Encoding**: LF (`\n`) and UTF-8 without BOM. Trailing whitespace must be stripped, and files must end with a single newline.
+    - **Line Endings & Encoding**: LF (`\n`) and UTF-8 without BOM. Because `Invoke-Formatter` preserves `\r\n` if the input contains CRLF, always normalize `($formatted -replace "`r`n", "`n").TrimEnd() + "`n"` before writing.
     - **Whitespace & Delimiters**: Space around pipes (`|`), operators, parameter separators, and parentheses. Semicolons as line terminators (`;`) are prohibited.
     - **Syntax Conventions**: Constant strings without variable interpolation must use single quotes (`'...'`). Cmdlet names and keywords must use canonical PascalCase. Hashtable assignment operators (`=`) must be aligned.
-- **Static Analysis Quality Gate (Zero Fixable Warnings)**:
-  - All common script warnings must be completely resolved:
+- **Static Analysis Quality Gate (Zero Violations)**:
+  - All common script warnings and errors must be completely resolved structurally:
     - `PSAvoidUsingCmdletAliases`: Cmdlet aliases (`select`, `where`, `dir`, `echo`, `gc`, `sc`) are strictly banned in script files. Use full cmdlet names (`Select-Object`, `Where-Object`, `Get-ChildItem`, etc.).
-    - `PSAvoidUsingEmptyCatchBlock`: Catch blocks must never be left empty. Always log, rethrow, or record errors.
-    - `PSUseUsingScopeModifierInNewRunspaces`: Variables referenced inside `ForEach-Object -Parallel` or background runspaces must use the `$using:` scope modifier.
+    - `PSAvoidUsingEmptyCatchBlock`: Catch blocks must never be left empty. Always log (`Write-Verbose`, `Write-Warning`, `[Console]::Error.WriteLine`), rethrow, or record errors.
+    - `PSAvoidUsingWriteHost`: `Write-Host` is strictly banned (along with `[Console]::Write` and `[Console]::WriteLine`, which are also flagged by `PSAvoidUsingWriteHost`). Use `Write-Output` for standard output, `[Console]::Error.WriteLine` for standard error, or `$Host.UI.Write` for in-place terminal spinners/progress.
+    - `PSUseSingularNouns` & `PSUseApprovedVerbs`: Function names must use approved PowerShell verbs (`Get-Verb`) and singular nouns.
+    - `PSUseUsingScopeModifierInNewRunspaces`: Variables referenced inside `ForEach-Object -Parallel` or `Start-ThreadJob -ScriptBlock` must use the `$using:` scope modifier.
     - `PSUseDeclaredVarsMoreThanAssignments`: Unused or abandoned variables must be removed.
-- **Rule Exclusions & Suppressions**:
-  - `PSUseBOMForUnicodeEncodedFile` is excluded because cross-platform shebang scripts (`#!/usr/bin/env -S pwsh`) break under UTF-8 BOM on Unix kernels (`exec: format error`).
-  - `PSAvoidUsingWriteHost`: Permitted in user-facing CLI utilities or installer scripts that require colored terminal output, guarded by `[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '')]`. In internal utility functions or non-interactive automation, use `Write-Output` or pipeline objects.
+- **Zero Lint Suppression & Zero Bypass Invariant**:
+  - STRICTLY PROHIBITED to add `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]` or `[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]` anywhere in `.ps1`, `.psm1`, or `.psd1` files.
+  - STRICTLY PROHIBITED to pass `-ExcludeRule`, narrow `-Severity`, or modify `PSScriptAnalyzerSettings.psd1` to disable or weaken rules.
+  - `PSUseBOMForUnicodeEncodedFile`, `PSAvoidUsingPositionalParameters`, and `PSProvideCommentHelp` are the only rules excluded in `PSScriptAnalyzerSettings.psd1` (because UTF-8 BOM breaks Unix shebangs `#!/usr/bin/env -S pwsh`).
 - **Standard Verification Commands**:
-  - Run static analysis:
+  - Format script definition (with mandatory CRLF-to-LF normalization and UTF-8 without BOM):
     ```powershell
-    pwsh -NoLogo -NoProfile -Command "Invoke-ScriptAnalyzer -Path <file.ps1> -Settings ./PSScriptAnalyzerSettings.psd1"
+    pwsh -NoLogo -NoProfile -Command "`$p = (Resolve-Path -LiteralPath '<file.ps1>').Path; `$raw = [System.IO.File]::ReadAllText(`$p); `$fmt = Invoke-Formatter -ScriptDefinition `$raw -Settings ./PSScriptAnalyzerSettings.psd1; `$clean = (`$fmt -replace \"`r`n\", \"`n\").TrimEnd() + \"`n\"; [System.IO.File]::WriteAllText(`$p, `$clean, [System.Text.UTF8Encoding]::new(`$false))"
     ```
-  - Format script definition:
+  - Run AST grammar check and non-bypassable static analysis (`-IncludeSuppressed`):
     ```powershell
-    pwsh -NoLogo -NoProfile -Command "$content = Get-Content -LiteralPath <file.ps1> -Raw; $formatted = Invoke-Formatter -ScriptDefinition $content -Settings ./PSScriptAnalyzerSettings.psd1; [System.IO.File]::WriteAllText((Resolve-Path <file.ps1>), $formatted.TrimEnd() + \"`n\", [System.Text.UTF8Encoding]::new($false))"
+    pwsh -NoLogo -NoProfile -Command "`$p = (Resolve-Path -LiteralPath '<file.ps1>').Path; `$err = `$null; [void][System.Management.Automation.Language.Parser]::ParseFile(`$p, [ref]`$null, [ref]`$err); if (`$err) { `$err; exit 1 }; `$res = @(Invoke-ScriptAnalyzer -Path `$p -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed); if (`$res.Count -gt 0) { `$res | Format-Table -AutoSize; exit 1 }"
     ```

@@ -45,17 +45,19 @@ $firstUrl = $lines[0]
 
 ### 2.1 Bootstrap Scripts vs Advanced Automation
 
-- **Bootstrap Scripts (`scripts/install.ps1`)**:
-  - Must run cleanly on out-of-the-box Windows 11 with default Windows PowerShell 5.1 (`powershell.exe`).
-  - Prohibited in bootstrap scripts:
+- **Bootstrap Scripts (`scripts/install.ps1`, `#Requires -Version 5.1`)**:
+  - Must run cleanly on out-of-the-box Windows 10/11 with default Windows PowerShell 5.1 (`powershell.exe`) as well as PowerShell 7+ (`pwsh.exe`).
+  - Prohibited in bootstrap scripts (enforced via `PSUseCompatibleSyntax` with `TargetVersions = @('5.1', '7.4')`):
     - Ternary operators: `$cond ? $a : $b`
     - Null-coalescing operators: `$a ?? $b`, `$a ??= $b`
     - Safe navigation: `$a?.b`
     - Pipeline chain operators: `&&`, `||`
     - Parallel loop: `ForEach-Object -Parallel`
     - Hashtable conversion: `ConvertFrom-Json -AsHashtable`
+    - Unprotected `$IsWindows` / `$IsMacOS` / `$IsLinux` reads (undefined in PS 5.1; throws `VariableIsUndefined` under `Set-StrictMode -Version Latest`; guard with `($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows`).
+    - Multi-character string `.Split('ab')` calls (use `-split` or `.Split([char[]]'ab')`).
 - **Modern Automation & CLI Scripts (`cli/*.ps1`)**:
-  - Always run under PowerShell 7 (`pwsh.exe`) and leverage modern syntax freely.
+  - Always run under PowerShell 7 (`pwsh.exe`) and leverage modern syntax freely. Refer to the **`modern-powershell`** skill for complete cross-platform and cross-version rules.
 
 ### 2.2 UTF-8 Pipeline Encoding
 
@@ -263,29 +265,33 @@ The single source of truth configuration is maintained in `PSScriptAnalyzerSetti
 
 ```powershell
 @{
-    Severity            = @('Error', 'Warning')
+    Severity            = @('ParseError', 'Error', 'Warning', 'Information')
     IncludeDefaultRules = $true
-    ExcludeRules        = @('PSUseBOMForUnicodeEncodedFile')
+    ExcludeRules        = @(
+        'PSUseBOMForUnicodeEncodedFile',
+        'PSAvoidUsingPositionalParameters',
+        'PSProvideCommentHelp'
+    )
 
     Rules               = @{
-        PSPlaceOpenBrace                          = @{
+        PSPlaceOpenBrace                             = @{
             Enable             = $true
             OnSameLine         = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
         }
-        PSPlaceCloseBrace                         = @{
+        PSPlaceCloseBrace                            = @{
             Enable             = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
         }
-        PSUseConsistentIndentation                = @{
+        PSUseConsistentIndentation                   = @{
             Enable              = $true
             Kind                = 'space'
             IndentationSize     = 4
             PipelineIndentation = 0
         }
-        PSUseConsistentWhitespace                 = @{
+        PSUseConsistentWhitespace                    = @{
             Enable                                  = $true
             CheckOpenBrace                          = $true
             CheckOpenParen                          = $true
@@ -297,34 +303,53 @@ The single source of truth configuration is maintained in `PSScriptAnalyzerSetti
             CheckPipeForRedundantWhitespace         = $true
             IgnoreAssignmentOperatorInsideHashTable = $true
         }
-        PSAlignAssignmentStatement                = @{
+        PSAlignAssignmentStatement                   = @{
             Enable         = $true
             CheckHashtable = $true
         }
-        PSAvoidUsingDoubleQuotesForConstantString = @{
+        PSAvoidUsingDoubleQuotesForConstantString    = @{
             Enable = $true
         }
-        PSAvoidSemicolonsAsLineTerminators        = @{
+        PSAvoidSemicolonsAsLineTerminators           = @{
             Enable = $true
         }
-        PSUseCorrectCasing                        = @{
+        PSUseCorrectCasing                           = @{
+            Enable = $true
+        }
+        PSAvoidTrailingWhitespace                    = @{
+            Enable = $true
+        }
+        PSPossibleIncorrectUsageOfAssignmentOperator = @{
             Enable = $true
         }
     }
 }
 ```
 
-### 9.3 In-Memory Formatting & Static Analysis Workflow
+### 9.3 Three-Stage Formatting, AST & Non-Bypassable Static Analysis Workflow
 
-After editing any `.ps1` or `.psm1` file, run formatting and static analysis:
+Never add `SuppressMessageAttribute` or pass `-ExcludeRule`. After editing any `.ps1`, `.psm1`, or `.psd1` file, run all three verification stages:
 
 ```powershell
-# 1. Format script
+# 1. Format script (with CRLF -> LF normalization and UTF-8 without BOM)
 $file = 'cli/command.ps1'
-$raw = Get-Content -LiteralPath $file -Raw
+$absPath = (Resolve-Path -LiteralPath $file).Path
+$raw = [System.IO.File]::ReadAllText($absPath)
 $formatted = Invoke-Formatter -ScriptDefinition $raw -Settings ./PSScriptAnalyzerSettings.psd1
-[System.IO.File]::WriteAllText((Resolve-Path $file), $formatted.TrimEnd() + "`n", [System.Text.UTF8Encoding]::new($false))
+$normalized = ($formatted -replace "`r`n", "`n").TrimEnd() + "`n"
+[System.IO.File]::WriteAllText($absPath, $normalized, [System.Text.UTF8Encoding]::new($false))
 
-# 2. Verify static analysis (must pass with 0 Warnings and 0 Errors)
-Invoke-ScriptAnalyzer -Path $file -Settings ./PSScriptAnalyzerSettings.psd1
+# 2. Verify AST grammar (zero parse errors)
+$parseErrors = $null
+[void][System.Management.Automation.Language.Parser]::ParseFile($absPath, [ref]$null, [ref]$parseErrors)
+if ($parseErrors) {
+    throw "AST syntax errors in ${file}: $parseErrors"
+}
+
+# 3. Verify static analysis with -IncludeSuppressed (must pass with 0 violations)
+$violations = @(Invoke-ScriptAnalyzer -Path $absPath -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed)
+if ($violations.Count -gt 0) {
+    $violations | Format-Table -AutoSize
+    throw "PSScriptAnalyzer failed on $file"
+}
 ```
