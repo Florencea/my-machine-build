@@ -47,7 +47,8 @@ Before staging any files, all modified files must be formatted and verified:
 - **Shell Scripts** (`scripts/*.sh`, `configs/bash/*`, `configs/zsh/*`):
   - Formatter: `shfmt -i 2 -ci -w <files>`
 - **PowerShell Scripts** (`cli/*.ps1`, `scripts/install.ps1`, `*.psm1`, `*.psd1`):
-  - Formatter: `Invoke-Formatter` via `PSScriptAnalyzerSettings.psd1` (Stroustrup style, 4-space indent, normalize CRLF to LF `\n`, UTF-8 without BOM).
+  - Project Root Configuration SSOT: Maintain `PSScriptAnalyzerSettings.psd1` directly in the project root (synchronized with `plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1`) to guarantee cross-platform VS Code zero-configuration discovery without Settings Sync path conflicts.
+  - Formatter: `Invoke-Formatter` via `./PSScriptAnalyzerSettings.psd1` (Stroustrup style, 4-space indent, normalize CRLF to LF `\n`, UTF-8 without BOM).
   - AST Verification: Verify zero parse errors via `[System.Management.Automation.Language.Parser]::ParseFile(...)`. For dual-version bootstrap scripts (`scripts/install.ps1` with `#Requires -Version 5.1`), enforce `PSUseCompatibleSyntax` (`TargetVersions = @('5.1', '7.4')`).
   - Static Analysis Gate: Run `Invoke-ScriptAnalyzer -Path <file> -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed` achieving **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
   - Zero Lint Suppression: Strictly prohibited to add `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]`, pass `-ExcludeRule`, or weaken `PSScriptAnalyzerSettings.psd1`.

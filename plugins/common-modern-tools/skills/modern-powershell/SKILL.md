@@ -71,6 +71,10 @@ Agents are strictly prohibited from skipping, muting, or weakening `PSScriptAnal
    - **`PSPlaceOpenBrace` / `PSPlaceCloseBrace` (`IgnoreOneLineBlock = $false`)**: Never write single-line control blocks (`if ($x) { return }` or `catch {}`). Always expand blocks across multiple lines using Stroustrup brace placement (`{` on the same line, body indented on a new line, `}` on its own line).
    - **`PSUseSingularNouns` & `PSUseApprovedVerbs`**: Name all functions with an approved PowerShell verb (`Get-Verb`) and a singular noun (e.g., `Convert-TimeToSecond` instead of `Convert-TimeToSeconds`).
    - **`PSUseUsingScopeModifierInNewRunspaces`**: Inside `ForEach-Object -Parallel` or `Start-ThreadJob -ScriptBlock`, reference caller-scoped variables directly with `$using:varName` rather than undeclared variables or `param(...)` blocks that trigger scope warnings.
+5. **Project-Level Configuration Inheritance**:
+   - Whenever a repository or workspace contains PowerShell scripts (`*.ps1`, `*.psm1`, `*.psd1`), `PSScriptAnalyzerSettings.psd1` must reside directly in the workspace root.
+   - If missing, copy it from the canonical plugin directory (`$HOME/.gemini/config/plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1` or local repo `plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1`).
+   - This ensures VS Code's default `powershell.scriptAnalysis.settingsPath` (`"PSScriptAnalyzerSettings.psd1"`) resolves automatically across macOS, Windows 11, and CI runners without OS-specific absolute path conflicts in VS Code Settings Sync.
 
 ---
 

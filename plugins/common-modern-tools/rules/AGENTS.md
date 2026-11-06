@@ -54,10 +54,12 @@
 - **Immediate Formatting After File Edits**:
   - Markdown (`*.md`), JSON (`*.json`), TypeScript/web code: Format immediately via `vpx oxfmt <files>`.
   - Shell scripts (`*.sh`, `*.zsh`, `*.bash`): Format with `shfmt -i 2 -ci -w <files>`.
-  - PowerShell scripts (`*.ps1`, `*.psm1`, `*.psd1`): Execute the mandatory 3-stage PowerShell verification pipeline against `PSScriptAnalyzerSettings.psd1`:
-    1. Formatting & LF Normalization: `Invoke-Formatter`, normalize CRLF to LF (`\n`), write as UTF-8 without BOM.
-    2. AST Grammar & Syntax Check: Zero parse errors via `[System.Management.Automation.Language.Parser]::ParseFile(...)`. For dual-version bootstrap scripts (`#Requires -Version 5.1`), enforce `PSUseCompatibleSyntax` (`TargetVersions = @('5.1', '7.4')`).
-    3. Static Analysis Gate: Run `Invoke-ScriptAnalyzer -Path <file> -Settings <settings.psd1> -IncludeSuppressed` achieving **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
+  - PowerShell scripts (`*.ps1`, `*.psm1`, `*.psd1`):
+    - **Project-Level Configuration Inheritance**: Whenever a project contains or introduces PowerShell scripts, `PSScriptAnalyzerSettings.psd1` must exist in the target project root. If absent, copy it from the canonical plugin directory (`$HOME/.gemini/config/plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1` or local repo `plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1`) into the project root. This guarantees VS Code zero-configuration discovery and eliminates cross-platform Settings Sync path conflicts.
+    - **3-Stage PowerShell Verification Pipeline**: Execute against `./PSScriptAnalyzerSettings.psd1`:
+      1. Formatting & LF Normalization: `Invoke-Formatter`, normalize CRLF to LF (`\n`), write as UTF-8 without BOM.
+      2. AST Grammar & Syntax Check: Zero parse errors via `[System.Management.Automation.Language.Parser]::ParseFile(...)`. For dual-version bootstrap scripts (`#Requires -Version 5.1`), enforce `PSUseCompatibleSyntax` (`TargetVersions = @('5.1', '7.4')`).
+      3. Static Analysis Gate: Run `Invoke-ScriptAnalyzer -Path <file> -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed` achieving **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
 - **Zero Suppression & Zero Bypass Policy**:
   - STRICTLY PROHIBITED: `[Diagnostics.CodeAnalysis.SuppressMessageAttribute(...)]`, `-ExcludeRule`, `@ts-ignore`, `@ts-expect-error`, `oxlint-disable`, `eslint-disable`.
   - Never use `Write-Host`, `[Console]::Write`, or `[Console]::WriteLine` in PowerShell scripts; use `Write-Output` for stdout, `[Console]::Error.WriteLine` for stderr.
