@@ -63,10 +63,24 @@ if (-not $isAdmin) {
 
 # Ensure persistent ExecutionPolicy for machine and user levels
 if ((Get-ExecutionPolicy -Scope CurrentUser) -ne 'Unrestricted') {
-    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force -ErrorAction SilentlyContinue
 }
-if ((Get-ExecutionPolicy -Scope LocalMachine) -ne 'Unrestricted') {
-    Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Unrestricted -Force
+
+# Configure Windows PowerShell 5.1 machine-level registry key safely
+$ps51RegistryPath = 'HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell'
+if (Test-Path -LiteralPath $ps51RegistryPath) {
+    Set-ItemProperty -Path $ps51RegistryPath -Name 'ExecutionPolicy' -Value 'Unrestricted' -Force -ErrorAction SilentlyContinue
+}
+
+# Apply LocalMachine execution policy with graceful fallback for packaged PowerShell (MSIX / Store)
+try {
+    $isPackagedApp = ($PSHOME -like '*\WindowsApps\*')
+    if (-not $isPackagedApp -and ((Get-ExecutionPolicy -Scope LocalMachine) -ne 'Unrestricted')) {
+        Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Unrestricted -Force -ErrorAction Stop
+    }
+}
+catch {
+    Write-Verbose 'Notice: LocalMachine execution policy is protected in packaged PowerShell. CurrentUser scope is active.'
 }
 
 # Enable Windows OS LongPaths support
