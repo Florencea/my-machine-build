@@ -192,6 +192,9 @@ fi
 # 7. Dotfiles and Custom Configurations
 SCRIPT_DIR="${0:A:h}"
 REPO_DIR="${SCRIPT_DIR:h}"
+if [[ ! -d "${REPO_DIR:-}/configs" && -d "$HOME/Developer/my-machine-build/configs" ]]; then
+  REPO_DIR="$HOME/Developer/my-machine-build"
+fi
 
 fetch_file() {
   local rel_path="$1"
@@ -369,9 +372,9 @@ install_casks \
 defaults write com.bjango.istatmenus license6 -dict email "982092332@qq.com" serial "GAWAE-FCWQ3-P8NYB-C7GF7-NEDRT-Q5DTB-MFZG6-6NEQC-CRMUD-8MZ2K-66SRB-SU8EW-EDLZ9-TGH3S-8SGA"
 
 # Keka configuration
-defaults write com.aone.keka SetAsDefaultApp -bool true
-defaults write com.aone.keka UseGrowl -bool false
-defaults write com.aone.keka SelectedTab -string "TAR"
+defaults write com.aone.keka SetAsDefaultApp -bool true 2>/dev/null || true
+defaults write com.aone.keka UseGrowl -bool false 2>/dev/null || true
+defaults write com.aone.keka SelectedTab -string "TAR" 2>/dev/null || true
 
 # IINA configuration
 defaults write com.colliderli.iina actionAfterLaunch -int 2
@@ -543,9 +546,29 @@ install_formulas \
   zsh-syntax-highlighting
 
 # Ensure PSScriptAnalyzer is installed for PowerShell static analysis
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoLogo -NoProfile -Command "if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck }" >/dev/null 2>&1 || true
-fi
+install_psscriptanalyzer() {
+  if ! command -v pwsh >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if pwsh -NoLogo -NoProfile -Command "if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { exit 1 }" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local pssa_version="1.25.0"
+  local pssa_dest="$HOME/.local/share/powershell/Modules/PSScriptAnalyzer/$pssa_version"
+  local pssa_tmp
+  pssa_tmp="$(mktemp -t pssa.XXXXXX).zip"
+
+  if curl -4 -fsSL "https://github.com/PowerShell/PSScriptAnalyzer/releases/download/${pssa_version}/PSScriptAnalyzer.${pssa_version}.nupkg" -o "$pssa_tmp" 2>/dev/null ||
+    curl -fsSL "https://github.com/PowerShell/PSScriptAnalyzer/releases/download/${pssa_version}/PSScriptAnalyzer.${pssa_version}.nupkg" -o "$pssa_tmp" 2>/dev/null; then
+    mkdir -p "$pssa_dest"
+    unzip -q -o "$pssa_tmp" -d "$pssa_dest" >/dev/null 2>&1 || true
+    rm -f "$pssa_tmp"
+  fi
+}
+
+install_psscriptanalyzer
 
 # 10. Vite+ Global CLI & Node.js Runtime Management
 if ! command -v vp >/dev/null 2>&1 && [[ ! -x "$HOME/.local/share/vite-plus/bin/vp" ]]; then

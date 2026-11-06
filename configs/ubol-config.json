@@ -456,6 +456,8 @@
     "news.ycombinator.com##.cce a:link:style(color:light-dark(var(--stylus-hn-cce-light),var(--stylus-hn-cce-dark)) !important)",
     "news.ycombinator.com##.cdd:style(color:light-dark(var(--stylus-hn-cdd-light),var(--stylus-hn-cdd-dark)) !important)",
     "news.ycombinator.com##.cdd a:link:style(color:light-dark(var(--stylus-hn-cdd-light),var(--stylus-hn-cdd-dark)) !important)",
+    "news.ycombinator.com##.subline>a[href^=\"item?id=\"]:visited:style(color:light-dark(var(--stylus-text-light),var(--stylus-text-dark)) !important)",
+    "news.ycombinator.com##.titleline>a:visited:style(text-decoration:underline !important)",
     "hn.algolia.com##:root:style(color-scheme:light dark)",
     "hn.algolia.com##html:style(--stylus-hn-primary-dark:#662900)",
     "hn.algolia.com##html:style(--stylus-hn-primary-light:#ff6600)",
