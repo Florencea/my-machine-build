@@ -38,7 +38,7 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
   - Required fields: `name` (lowercase kebab-case matching folder name), `description`.
 - **Plugin Rules (`plugins/<plugin-name>/rules/AGENTS.md`)**:
   - Plain Markdown **without YAML frontmatter** (continuously active while the plugin is enabled).
-  - Must stay strictly under the `24 KB` (`24,000` bytes) per-file cap.
+  - Must stay strictly under **8 KB (~2,500 tokens)** to prevent aggregate 20,000-token rules budget demotion. Focus exclusively on hard invariants, prohibitions, and security boundaries. Catalogs and step-by-step procedures belong in Skills.
 - **Plugin Skills (`plugins/<plugin-name>/skills/<skill-name>/SKILL.md`)**:
   - YAML frontmatter required: `name`, `description`, `compatibility`.
   - NEVER put `trigger: always_on` in skills.
