@@ -121,3 +121,36 @@
 - **Dev Drive (`E:\`) & ReFS Performance Mode**:
   - Workspace `E:\_Workspace` and Vite+ toolchain directory `VP_HOME = E:\vite-plus` reside on ReFS Dev Drive (`E:`).
   - Microsoft Defender operates in asynchronous Performance Mode on Dev Drive volumes, significantly accelerating I/O.
+
+---
+
+## 8. Mandatory PowerShell Script Quality Gate & VS Code Formatter Alignment
+
+- **Post-Edit Verification & Formatting Invariant**:
+  - Whenever you create, modify, or refactor any PowerShell script (`*.ps1`, `*.psm1`, `*.psd1`), you MUST execute static analysis and formatting using `PSScriptAnalyzer` before taking further actions, staging changes, or concluding the task.
+  - Verification must achieve **0 Errors and 0 Warnings** against `PSScriptAnalyzerSettings.psd1`.
+- **VS Code Global Formatting Parity**:
+  - Code formatting must strictly adhere to the user's VS Code configuration:
+    - **Preset**: `Stroustrup` style (opening brace `{` on the same line as statements, closing brace `}` on a separate line).
+    - **Indentation**: 4 spaces (`Kind = 'space'`, `IndentationSize = 4`, `PipelineIndentation = 0`). Tabs are prohibited.
+    - **Line Endings & Encoding**: LF (`\n`) and UTF-8 without BOM. Trailing whitespace must be stripped, and files must end with a single newline.
+    - **Whitespace & Delimiters**: Space around pipes (`|`), operators, parameter separators, and parentheses. Semicolons as line terminators (`;`) are prohibited.
+    - **Syntax Conventions**: Constant strings without variable interpolation must use single quotes (`'...'`). Cmdlet names and keywords must use canonical PascalCase. Hashtable assignment operators (`=`) must be aligned.
+- **Static Analysis Quality Gate (Zero Fixable Warnings)**:
+  - All common script warnings must be completely resolved:
+    - `PSAvoidUsingCmdletAliases`: Cmdlet aliases (`select`, `where`, `dir`, `echo`, `gc`, `sc`) are strictly banned in script files. Use full cmdlet names (`Select-Object`, `Where-Object`, `Get-ChildItem`, etc.).
+    - `PSAvoidUsingEmptyCatchBlock`: Catch blocks must never be left empty. Always log, rethrow, or record errors.
+    - `PSUseUsingScopeModifierInNewRunspaces`: Variables referenced inside `ForEach-Object -Parallel` or background runspaces must use the `$using:` scope modifier.
+    - `PSUseDeclaredVarsMoreThanAssignments`: Unused or abandoned variables must be removed.
+- **Rule Exclusions & Suppressions**:
+  - `PSUseBOMForUnicodeEncodedFile` is excluded because cross-platform shebang scripts (`#!/usr/bin/env -S pwsh`) break under UTF-8 BOM on Unix kernels (`exec: format error`).
+  - `PSAvoidUsingWriteHost`: Permitted in user-facing CLI utilities or installer scripts that require colored terminal output, guarded by `[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '')]`. In internal utility functions or non-interactive automation, use `Write-Output` or pipeline objects.
+- **Standard Verification Commands**:
+  - Run static analysis:
+    ```powershell
+    pwsh -NoLogo -NoProfile -Command "Invoke-ScriptAnalyzer -Path <file.ps1> -Settings ./PSScriptAnalyzerSettings.psd1"
+    ```
+  - Format script definition:
+    ```powershell
+    pwsh -NoLogo -NoProfile -Command "$content = Get-Content -LiteralPath <file.ps1> -Raw; $formatted = Invoke-Formatter -ScriptDefinition $content -Settings ./PSScriptAnalyzerSettings.psd1; [System.IO.File]::WriteAllText((Resolve-Path <file.ps1>), $formatted.TrimEnd() + \"`n\", [System.Text.UTF8Encoding]::new($false))"
+    ```

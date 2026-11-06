@@ -642,6 +642,16 @@ foreach ($pDir in $profileDirs) {
     }
 }
 
+# Ensure PSScriptAnalyzer is installed for PowerShell static analysis
+if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+    try {
+        Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+    }
+    catch {
+        Write-Host "Warning: Failed to install PSScriptAnalyzer: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 # 8. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
 Write-Host '[8/9] Syncing Antigravity Plugins...' -ForegroundColor Cyan
 $pluginsDestRoot = Join-Path $HOME '.gemini\config\plugins'

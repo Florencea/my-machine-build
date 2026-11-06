@@ -41,9 +41,10 @@ Always prefer high-performance single-purpose CLI binaries for instant execution
   - YAML / XML / TOML querying and in-place editing $\rightarrow$ `yq "<filter>" <file>` (supports in-place edits via `-i`).
 - **Text Replacement**:
   - Fast, safe in-place regex or string literal replacement $\rightarrow$ `sd "pattern" "replacement" <file>` (use `sd -F "literal" "replacement" <file>` for fixed strings). STRICTLY FORBIDDEN to use `sed`.
-- **Formatting**:
+- **Formatting & Static Analysis**:
   - Shell scripts (`.sh`, `.zsh`, `.bash`) $\rightarrow$ `shfmt -i 2 -ci -w <file>`.
   - Markdown, JSON & code files $\rightarrow$ `vpx oxfmt <file>`.
+  - PowerShell scripts (`.ps1`, `.psm1`) $\rightarrow$ `Invoke-Formatter` and `Invoke-ScriptAnalyzer -Settings ./PSScriptAnalyzerSettings.psd1` (matching VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM).
 - **CI/CD Workflow Static Analysis (`actionlint`)**:
   - Lint GitHub Actions workflows $\rightarrow$ `actionlint` (verifies syntax, runner directives, expression syntax).
 - **Execution Benchmarking (`hyperfine`)**:
@@ -224,6 +225,9 @@ Agents MUST actively inspect official documentation or run `<tool> --help` befor
 - **PowerShell 7 (`pwsh`)**:
   - Syntax Outline: `pwsh -NoLogo -NoProfile -Command "Get-Command <cmdlet> -Syntax"`
   - Official Reference: `webread https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters`
+- **PSScriptAnalyzer (`Invoke-ScriptAnalyzer`, `Invoke-Formatter`)**:
+  - Official Reference: `webread https://github.com/PowerShell/PSScriptAnalyzer`
+  - Workspace Settings: `PSScriptAnalyzerSettings.psd1` (aligns with VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM)
 - **Node.js (Active LTS)**:
   - Built-in APIs: Query local type declarations or inspect `https://nodejs.org/api/`
 

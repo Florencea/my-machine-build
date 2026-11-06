@@ -84,12 +84,14 @@
 
 ---
 
-## 6. Mandatory Post-Edit Formatting Protocol
+## 6. Mandatory Post-Edit Formatting & Verification Protocol
 
 - **Immediate Formatting After File Edits**:
-  - Whenever you create or modify Markdown (`*.md`), JSON (`*.json`), or TypeScript/code files via file tools (`edit_file`, `write_file`, `sd`), you MUST immediately format those files using `vpx oxfmt <files>` before taking any further action, running checks, or responding to the user.
-- **Zero Unformatted Files Policy**:
-  - Never leave modified Markdown, JSON, or code files unformatted on disk.
+  - Whenever you create or modify Markdown (`*.md`), JSON (`*.json`), or TypeScript/web code files via file tools (`edit_file`, `write_file`, `sd`), you MUST immediately format those files using `vpx oxfmt <files>` before taking any further action, running checks, or responding to the user.
+  - Shell scripts (`*.sh`, `*.zsh`, `*.bash`): Format with `shfmt -i 2 -ci -w <files>`.
+  - PowerShell scripts (`*.ps1`, `*.psm1`): Format using `Invoke-Formatter` and verify static analysis via `Invoke-ScriptAnalyzer` against `PSScriptAnalyzerSettings.psd1` (matching VS Code `Stroustrup` style, 4-space indentation, LF, and UTF-8 without BOM with zero warnings).
+- **Zero Unformatted or Unverified Files Policy**:
+  - Never leave modified Markdown, JSON, Shell, or PowerShell files unformatted or failing static analysis on disk.
 
 ---
 

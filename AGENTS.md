@@ -51,7 +51,8 @@ Before staging any files, all modified files must be formatted and verified:
 - **Shell Scripts** (`scripts/*.sh`, `configs/bash/*`, `configs/zsh/*`):
   - Formatter: `shfmt -i 2 -ci -w <files>`
 - **PowerShell Scripts** (`cli/*.ps1`, `scripts/install.ps1`):
-  - Formatter: `Invoke-Formatter` via `PSScriptAnalyzer` (matching VS Code `ms-vscode.powershell` default formatter, saved with LF `\n` and UTF-8 without BOM).
+  - Formatter: `Invoke-Formatter` via `PSScriptAnalyzer` using `PSScriptAnalyzerSettings.psd1` (matching VS Code global settings: `Stroustrup` style, 4-space indent, no semicolons, single-quoted constant strings, saved with LF `\n` and UTF-8 without BOM).
+  - Static Analysis: Run `Invoke-ScriptAnalyzer -Path <file> -Settings ./PSScriptAnalyzerSettings.psd1` with a zero-warning gate (**0 Errors, 0 Warnings**), eliminating all aliases, empty catch blocks, and uninitialized scope variables.
   - AST Verification: Verify zero syntax errors using `[System.Management.Automation.Language.Parser]::ParseFile(...)` via `pwsh -NoLogo -NoProfile`.
   - Note: `scripts/install.ps1` must remain strictly compatible with both Windows PowerShell 5.1 and PowerShell 7+.
 - **Markdown & Code Files** (`*.md`, `*.json`, `*.ts`):

@@ -48,12 +48,18 @@ description: Rules for managing, authoring, and verifying cross-platform PowerSh
 
 ---
 
-## 4. Cross-Platform Formatting & AST Syntax Verification
+## 4. Cross-Platform Formatting, Static Analysis & AST Syntax Verification
 
-- **Formatting (`PSScriptAnalyzer` / `ms-vscode.powershell`)**:
-  - Format all `.ps1` scripts using `Invoke-Formatter` (`PSScriptAnalyzer`) and save with LF (`\n`) line endings and UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang works identically across macOS and Windows 11.
+- **Formatting (`PSScriptAnalyzer` / VS Code Parity)**:
+  - Format all `.ps1` scripts using `Invoke-Formatter` with `PSScriptAnalyzerSettings.psd1` (matching VS Code global settings: `Stroustrup` style, 4-space indent, aligned hashtables, single-quoted constant strings, LF `\n` line endings, and UTF-8 without BOM so the `#!/usr/bin/env -S pwsh -NoLogo -NoProfile` shebang works identically across macOS and Windows 11).
+- **Static Analysis Gate (`Invoke-ScriptAnalyzer`)**:
+  - Before staging any `cli/*.ps1` changes, run static analysis and achieve **0 Errors, 0 Warnings**:
+    ```bash
+    pwsh -NoLogo -NoProfile -Command "Invoke-ScriptAnalyzer -Path 'cli/<command>.ps1' -Settings './PSScriptAnalyzerSettings.psd1'"
+    ```
+  - Eliminate all cmdlet aliases (`select`, `where`, `dir`, `echo`, `gc`), empty catch blocks, uninitialized parallel runspace variables (`$using:`), and unapproved verbs.
 - **AST Syntax Verification**:
-  - Before staging any `cli/*.ps1` changes, verify zero syntax errors using the PowerShell language parser:
+  - Verify zero syntax errors using the PowerShell language parser:
     ```bash
     pwsh -NoLogo -NoProfile -Command '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("cli/<command>.ps1", [ref]$null, [ref]$errors); if ($errors) { $errors; exit 1 }'
     ```

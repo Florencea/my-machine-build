@@ -234,3 +234,96 @@ git checkout -- .
 # 4. Verify clean working tree:
 git status
 ```
+
+---
+
+## 9. PowerShell Script Quality Assurance & VS Code Parity
+
+### 9.1 The Problem with Abandoned Script Warnings
+
+When writing PowerShell scripts, subtle warnings often escape detection (such as Cmdlet aliases, empty catch blocks, unapproved verbs, or missing scope modifiers). In particular, when executing parallel loops (`ForEach-Object -Parallel`), omitting `$using:` on caller-scoped variables causes silent parameter assignment bugs or runtime failures:
+
+```powershell
+# BAD: Omitting $using: causes $cmdExe to be $null inside the parallel runspace
+$items | ForEach-Object -Parallel {
+    & $cmdExe $_
+}
+
+# GOOD: Explicit $using: modifier binds the caller variable
+$items | ForEach-Object -Parallel {
+    & $using:cmdExe $_
+}
+```
+
+### 9.2 VS Code Formatting Parity Settings
+
+The workspace enforces exact alignment with the user's VS Code PowerShell formatting configuration (`Stroustrup` style, 4-space indentation, no trailing semicolons, aligned hashtables, and constant single quotes).
+
+The single source of truth configuration is maintained in `PSScriptAnalyzerSettings.psd1`:
+
+```powershell
+@{
+    Severity            = @('Error', 'Warning')
+    IncludeDefaultRules = $true
+    ExcludeRules        = @('PSUseBOMForUnicodeEncodedFile')
+
+    Rules               = @{
+        PSPlaceOpenBrace                          = @{
+            Enable             = $true
+            OnSameLine         = $true
+            NewLineAfter       = $true
+            IgnoreOneLineBlock = $false
+        }
+        PSPlaceCloseBrace                         = @{
+            Enable             = $true
+            NewLineAfter       = $true
+            IgnoreOneLineBlock = $false
+        }
+        PSUseConsistentIndentation                = @{
+            Enable              = $true
+            Kind                = 'space'
+            IndentationSize     = 4
+            PipelineIndentation = 0
+        }
+        PSUseConsistentWhitespace                 = @{
+            Enable                          = $true
+            CheckOpenBrace                  = $true
+            CheckOpenParen                  = $true
+            CheckOperator                   = $true
+            CheckSeparator                  = $true
+            CheckInnerBrace                 = $true
+            CheckParameter                  = $true
+            CheckPipe                       = $true
+            CheckPipeForRedundantWhitespace = $true
+        }
+        PSAlignAssignmentStatement                = @{
+            Enable         = $true
+            CheckHashtable = $true
+        }
+        PSAvoidUsingDoubleQuotesForConstantString = @{
+            Enable = $true
+        }
+        PSAvoidSemicolonsAsLineTerminators        = @{
+            Enable = $true
+        }
+        PSUseCorrectCasing                        = @{
+            Enable = $true
+        }
+    }
+}
+```
+
+### 9.3 In-Memory Formatting & Static Analysis Workflow
+
+After editing any `.ps1` or `.psm1` file, run formatting and static analysis:
+
+```powershell
+# 1. Format script
+$file = 'cli/command.ps1'
+$raw = Get-Content -LiteralPath $file -Raw
+$formatted = Invoke-Formatter -ScriptDefinition $raw -Settings ./PSScriptAnalyzerSettings.psd1
+[System.IO.File]::WriteAllText((Resolve-Path $file), $formatted.TrimEnd() + "`n", [System.Text.UTF8Encoding]::new($false))
+
+# 2. Verify static analysis (must pass with 0 Warnings and 0 Errors)
+Invoke-ScriptAnalyzer -Path $file -Settings ./PSScriptAnalyzerSettings.psd1
+```

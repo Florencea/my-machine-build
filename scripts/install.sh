@@ -540,6 +540,11 @@ install_formulas \
   zsh-autosuggestions \
   zsh-syntax-highlighting
 
+# Ensure PSScriptAnalyzer is installed for PowerShell static analysis
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoLogo -NoProfile -Command "if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck }" >/dev/null 2>&1 || true
+fi
+
 # 10. Vite+ Global CLI & Node.js Runtime Management
 if ! command -v vp >/dev/null 2>&1 && [[ ! -x "$HOME/.local/share/vite-plus/bin/vp" ]]; then
   curl -fsSL https://vite.plus | CI=true VP_NODE_MANAGER=yes VP_PM_MANAGER=yes bash >/dev/null 2>&1
