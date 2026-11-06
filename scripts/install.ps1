@@ -35,6 +35,16 @@ if ([string]::IsNullOrWhiteSpace($currentScript)) {
     $currentScript = $MyInvocation.MyCommand.Path
 }
 
+# Resolve Windows 10 vs Windows 11 platform status safely across PS 5.1 and PS 7+
+$isWin = ($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows
+$isWindows10 = $false
+if ($isWin) {
+    $osVer = [System.Environment]::OSVersion.Version
+    if ($osVer.Major -eq 10 -and $osVer.Build -lt 22000) {
+        $isWindows10 = $true
+    }
+}
+
 # Self-elevation to Administrator if running under standard user
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -43,7 +53,10 @@ if (-not $isAdmin) {
     Write-Output 'Administrator privileges required. Requesting elevation...'
     $hostProcess = (Get-Process -Id $PID).Path
     if ([string]::IsNullOrWhiteSpace($hostProcess) -or -not (Test-Path -LiteralPath $hostProcess)) {
-        if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($isWindows10) {
+            $hostProcess = 'powershell.exe'
+        }
+        elseif ($PSVersionTable.PSEdition -eq 'Core') {
             $hostProcess = 'pwsh.exe'
         }
         else {
@@ -237,6 +250,86 @@ else {
 }
 
 # 4. WinGet Bootstrap & Package Installation
+function Get-AppxPackageCompat {
+    param(
+        [string]$Name,
+        [switch]$AllUsers
+    )
+    if ($isWindows10 -and ($PSVersionTable.PSEdition -eq 'Core')) {
+        $allUsersArg = ''
+        if ($AllUsers) {
+            $allUsersArg = '-AllUsers'
+        }
+        $cmd = "Get-AppxPackage -Name '$Name' $allUsersArg | Select-Object -Property Name, PackageFullName, InstallLocation | ConvertTo-Json -Compress"
+        $rawJson = (& powershell.exe -NoLogo -NoProfile -Command $cmd 2>$null)
+        if ($rawJson) {
+            try {
+                return ($rawJson | ConvertFrom-Json)
+            }
+            catch {
+                return $null
+            }
+        }
+        return $null
+    }
+    if ($AllUsers) {
+        return (Get-AppxPackage -Name $Name -AllUsers -ErrorAction SilentlyContinue)
+    }
+    return (Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue)
+}
+
+function Add-AppxPackageCompat {
+    param(
+        [string]$Path,
+        [string[]]$DependencyPath = @()
+    )
+    if ($isWindows10 -and ($PSVersionTable.PSEdition -eq 'Core')) {
+        $depArgs = ''
+        if ($DependencyPath -and ($DependencyPath.Count -gt 0)) {
+            $joined = ($DependencyPath | ForEach-Object { "'$_'" }) -join ','
+            $depArgs = "-DependencyPath @($joined)"
+        }
+        $cmd = "Add-AppxPackage -Path '$Path' $depArgs"
+        & powershell.exe -NoLogo -NoProfile -Command $cmd
+        if ($LASTEXITCODE -ne 0) {
+            throw "Add-AppxPackage failed for '$Path'."
+        }
+        return
+    }
+    if ($DependencyPath -and ($DependencyPath.Count -gt 0)) {
+        Add-AppxPackage -Path $Path -DependencyPath $DependencyPath -ErrorAction Stop
+    }
+    else {
+        Add-AppxPackage -Path $Path -ErrorAction Stop
+    }
+}
+
+function Add-AppxProvisionedPackageCompat {
+    param(
+        [string]$PackagePath,
+        [string[]]$DependencyPackagePath = @()
+    )
+    if ($isWindows10 -and ($PSVersionTable.PSEdition -eq 'Core')) {
+        $depArgs = ''
+        if ($DependencyPackagePath -and ($DependencyPackagePath.Count -gt 0)) {
+            $joined = ($DependencyPackagePath | ForEach-Object { "'$_'" }) -join ','
+            $depArgs = "-DependencyPackagePath @($joined)"
+        }
+        $cmd = "Add-AppxProvisionedPackage -Online -PackagePath '$PackagePath' $depArgs -SkipLicense"
+        & powershell.exe -NoLogo -NoProfile -Command $cmd | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Add-AppxProvisionedPackage failed for '$PackagePath'."
+        }
+        return
+    }
+    if ($DependencyPackagePath -and ($DependencyPackagePath.Count -gt 0)) {
+        Add-AppxProvisionedPackage -Online -PackagePath $PackagePath -DependencyPackagePath $DependencyPackagePath -SkipLicense -ErrorAction Stop | Out-Null
+    }
+    else {
+        Add-AppxProvisionedPackage -Online -PackagePath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
+    }
+}
+
 function Initialize-Winget {
     if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
         return
@@ -253,7 +346,7 @@ function Initialize-Winget {
     }
 
     Import-Module Appx -ErrorAction SilentlyContinue
-    $existingPkg = Get-AppxPackage -Name 'Microsoft.DesktopAppInstaller' -ErrorAction SilentlyContinue
+    $existingPkg = Get-AppxPackageCompat -Name 'Microsoft.DesktopAppInstaller'
     if ($existingPkg -and $existingPkg.InstallLocation) {
         $pkgWinget = Join-Path $existingPkg.InstallLocation 'winget.exe'
         if (Test-Path -LiteralPath $pkgWinget) {
@@ -348,7 +441,7 @@ function Initialize-Winget {
         foreach ($dep in $depFiles) {
             Write-Output "        - Installing dependency: $($dep.Name)"
             try {
-                Add-AppxPackage -Path $dep.FullName -ErrorAction Stop
+                Add-AppxPackageCompat -Path $dep.FullName
             }
             catch {
                 Write-Output "          [Note] $($_.Exception.Message.Trim())"
@@ -359,20 +452,20 @@ function Initialize-Winget {
         Write-Output '      Registering WinGet DesktopAppInstaller package...'
         try {
             if ($depPaths.Count -gt 0) {
-                Add-AppxPackage -Path $wingetPath -DependencyPath $depPaths -ErrorAction Stop
+                Add-AppxPackageCompat -Path $wingetPath -DependencyPath $depPaths
             }
             else {
-                Add-AppxPackage -Path $wingetPath -ErrorAction Stop
+                Add-AppxPackageCompat -Path $wingetPath
             }
         }
         catch {
             Write-Output "      [!] Add-AppxPackage failed: $($_.Exception.Message). Falling back to Add-AppxProvisionedPackage..."
             try {
                 if ($depPaths.Count -gt 0) {
-                    Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -DependencyPackagePath $depPaths -SkipLicense -ErrorAction Stop | Out-Null
+                    Add-AppxProvisionedPackageCompat -PackagePath $wingetPath -DependencyPackagePath $depPaths
                 }
                 else {
-                    Add-AppxProvisionedPackage -Online -PackagePath $wingetPath -SkipLicense -ErrorAction Stop | Out-Null
+                    Add-AppxProvisionedPackageCompat -PackagePath $wingetPath
                 }
             }
             catch {
@@ -386,7 +479,7 @@ function Initialize-Winget {
             }
         }
 
-        $newPkg = Get-AppxPackage -Name 'Microsoft.DesktopAppInstaller' -ErrorAction SilentlyContinue
+        $newPkg = Get-AppxPackageCompat -Name 'Microsoft.DesktopAppInstaller'
         if ($newPkg -and $newPkg.InstallLocation) {
             $pkgWinget = Join-Path $newPkg.InstallLocation 'winget.exe'
             if (Test-Path -LiteralPath $pkgWinget) {
@@ -420,7 +513,7 @@ function Initialize-Winget {
 Initialize-Winget
 
 function Initialize-MicrosoftStore {
-    $existing = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+    $existing = Get-AppxPackageCompat -Name 'Microsoft.WindowsStore' -AllUsers
     if ($existing) {
         Write-Output '      [OK] Microsoft Store is already installed.'
         return
@@ -432,7 +525,7 @@ function Initialize-MicrosoftStore {
     if (Get-Command 'winget' -ErrorAction SilentlyContinue) {
         Write-Output '      Installing Microsoft Store via WinGet (msstore: 9WZDNCRFJBMP)...'
         & winget install --id 9WZDNCRFJBMP --source msstore --exact --accept-package-agreements --accept-source-agreements --disable-interactivity 2>$null
-        $check = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+        $check = Get-AppxPackageCompat -Name 'Microsoft.WindowsStore' -AllUsers
         if ($check) {
             $installed = $true
         }
@@ -443,7 +536,7 @@ function Initialize-MicrosoftStore {
         Start-Process -FilePath 'wsreset.exe' -ArgumentList '-i' -Wait -NoNewWindow -ErrorAction SilentlyContinue
     }
 
-    $finalCheck = Get-AppxPackage -Name 'Microsoft.WindowsStore' -AllUsers -ErrorAction SilentlyContinue
+    $finalCheck = Get-AppxPackageCompat -Name 'Microsoft.WindowsStore' -AllUsers
     if ($finalCheck) {
         Write-Output '      [OK] Microsoft Store installed successfully.'
     }
@@ -496,7 +589,6 @@ $cliPackages = @(
     @{ Id = 'sharkdp.hyperfine'; Name = 'hyperfine' },
     @{ Id = 'Gyan.FFmpeg'; Name = 'FFmpeg' },
     @{ Id = 'yt-dlp.yt-dlp'; Name = 'yt-dlp' },
-    @{ Id = 'ImageOptim.gifski'; Name = 'gifski' },
     @{ Id = 'AgileBits.1Password.CLI'; Name = '1Password CLI (op)' }
 )
 foreach ($pkg in $cliPackages) {
@@ -510,7 +602,8 @@ $desktopPackages = @(
     @{ Id = 'AgileBits.1Password'; Name = '1Password' },
     @{ Id = 'WinMerge.WinMerge'; Name = 'WinMerge' },
     @{ Id = 'RevoUninstaller.RevoUninstaller'; Name = 'Revo Uninstaller' },
-    @{ Id = '7zip.7zip'; Name = '7-Zip' }
+    @{ Id = '7zip.7zip'; Name = '7-Zip' },
+    @{ Id = 'ImageOptim.gifski'; Name = 'gifski' }
 )
 foreach ($pkg in $desktopPackages) {
     Install-WingetIdempotent -Id $pkg.Id -Name $pkg.Name
@@ -563,7 +656,13 @@ else {
 & git config --global alias.br 'branch'
 & git config --global alias.ci 'commit'
 & git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-& git config --global alias.remote-init '!f() { name=$(basename $(pwd)); remote=D:/Data/_GitRemote/${name}.git; git init --bare "$remote" && git remote add origin "$remote" && git push -u origin --all && git push origin --tags; }; f'
+$gitRemoteBase = if (Test-Path 'D:\') {
+    'D:/Data/_GitRemote'
+}
+else {
+    ($HOME -replace '\\', '/') + '/_GitRemote'
+}
+& git config --global alias.remote-init "!f() { name=`$(basename `$(pwd)); remote=$gitRemoteBase/`${name}.git; git init --bare `"`$remote`" && git remote add origin `"`$remote`" && git push -u origin --all && git push origin --tags; }; f"
 
 $gitHooksDir = Join-Path $HOME '.config\git\hooks'
 if (-not (Test-Path -LiteralPath $gitHooksDir)) {

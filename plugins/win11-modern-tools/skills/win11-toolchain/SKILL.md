@@ -72,8 +72,11 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 ## 3. Dev Drive (`E:\`) & ReFS Performance Optimization
 
-- Dev Drive utilizes the ReFS filesystem with asynchronous Microsoft Defender filter inspection.
-- When creating workspace directories or caches, place them under `E:\_Workspace` or `VP_HOME = E:\vite-plus` to maximize build and disk throughput.
+- Dev Drive utilizes the ReFS filesystem with asynchronous Microsoft Defender filter inspection on Windows 11 Build 22621+.
+- When creating workspace directories or caches on Windows 11, place them under `E:\_Workspace` or `VP_HOME = E:\vite-plus` to maximize build and disk throughput.
+- **Windows 10 IoT LTSC Fallback Invariant**:
+  - Dev Drive (`fsutil devdrv`) is strictly unsupported on Windows 10 (Build 19044/19045). Never invoke `fsutil devdrv` on Windows 10.
+  - On Windows 10 IoT LTSC, use standard NTFS paths: `$HOME\_Workspace` and `VP_HOME = $HOME\.vite-plus`.
 
 ---
 

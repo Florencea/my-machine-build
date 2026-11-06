@@ -64,9 +64,13 @@
 
 ---
 
-## 4. Dev Drive (ReFS) & Windows Defender Performance
+## 4. Dev Drive (ReFS), Windows 10 IoT LTSC Matrix & Performance
 
-- **Dev Drive Optimization**:
+- **Windows 11 vs Windows 10 IoT LTSC Capability Matrix**:
+  - **Dev Drive (ReFS)**: Supported exclusively on Windows 11 Build 22621+. Dev Drive (`fsutil devdrv`) is strictly unavailable on Windows 10 IoT LTSC. On Windows 10, use standard NTFS storage (`$HOME\_Workspace`, `~/.vite-plus`) without attempting Dev Drive queries.
+  - **Sudo Command**: Native `sudo.exe` requires Windows 11 Build 26052+. On Windows 10 IoT LTSC, privileged operations must use `Start-Process -Verb RunAs` or self-elevating scripts.
+  - **PowerShell 7 AppX Barrier**: On Windows 10, the in-box `Appx` module throws `PlatformNotSupportedException` (`0x80131539`) under PowerShell 7 (.NET Core). AppX queries or package installations must be delegated to Windows PowerShell 5.1 (`powershell.exe -NoLogo -NoProfile -Command "..."`).
+- **Dev Drive Optimization (Windows 11 Only)**:
   - Dev Drive volumes formatted with ReFS support Copy-on-Write (Block Cloning) and disable synchronous filter drivers. Prioritize placing package caches (`PNPM_HOME`, `VITE_CACHE_DIR`) and Git workspaces on Dev Drive.
 - **Windows Defender Process Exclusion**:
   - In development environments, verify that modern developer processes (`pwsh.exe`, `vp.exe`, `node.exe`, `git.exe`) and build directories (`dist`, `node_modules`) are excluded from real-time monitoring to prevent I/O bottlenecks.

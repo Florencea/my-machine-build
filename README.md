@@ -445,6 +445,9 @@ powershell.exe -ExecutionPolicy Bypass -File .\scripts\install.ps1
 
 ### Dev Drive (ReFS)
 
+> [!NOTE]
+> Dev Drive (ReFS) is supported exclusively on Windows 11 (Build 22621+). On Windows 10 IoT LTSC, Dev Drive is not supported; standard NTFS volumes (`$HOME\_Workspace` and `$HOME\.vite-plus`) are used automatically.
+
 1. Open **Settings** $\rightarrow$ **System** $\rightarrow$ **Storage** $\rightarrow$ **Advanced storage settings** $\rightarrow$ **Disks & volumes**.
 2. Click **Create Dev Drive** $\rightarrow$ **Resize an existing volume** (`50 GB–120 GB`), Label `Developer`, Drive Letter `E:`.
 3. Verify volume and Dev Drive trust status:
