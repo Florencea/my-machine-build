@@ -22,15 +22,16 @@
             PipelineIndentation = 0
         }
         PSUseConsistentWhitespace                 = @{
-            Enable                          = $true
-            CheckOpenBrace                  = $true
-            CheckOpenParen                  = $true
-            CheckOperator                   = $true
-            CheckSeparator                  = $true
-            CheckInnerBrace                 = $true
-            CheckParameter                  = $true
-            CheckPipe                       = $true
-            CheckPipeForRedundantWhitespace = $true
+            Enable                                  = $true
+            CheckOpenBrace                          = $true
+            CheckOpenParen                          = $true
+            CheckOperator                           = $true
+            CheckSeparator                          = $true
+            CheckInnerBrace                         = $true
+            CheckParameter                          = $true
+            CheckPipe                               = $true
+            CheckPipeForRedundantWhitespace         = $true
+            IgnoreAssignmentOperatorInsideHashTable = $true
         }
         PSAlignAssignmentStatement                = @{
             Enable         = $true
