@@ -273,7 +273,8 @@ The single source of truth configuration is maintained in `PSScriptAnalyzerSetti
     ExcludeRules        = @(
         'PSUseBOMForUnicodeEncodedFile',
         'PSAvoidUsingPositionalParameters',
-        'PSProvideCommentHelp'
+        'PSProvideCommentHelp',
+        'PSUseConsistentIndentation'
     )
 
     Rules               = @{
@@ -287,12 +288,6 @@ The single source of truth configuration is maintained in `PSScriptAnalyzerSetti
             Enable             = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
-        }
-        PSUseConsistentIndentation                   = @{
-            Enable              = $true
-            Kind                = 'space'
-            IndentationSize     = 4
-            PipelineIndentation = 0
         }
         PSUseConsistentWhitespace                    = @{
             Enable                                  = $true

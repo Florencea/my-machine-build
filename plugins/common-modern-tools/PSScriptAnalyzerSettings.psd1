@@ -4,7 +4,8 @@
     ExcludeRules        = @(
         'PSUseBOMForUnicodeEncodedFile',
         'PSAvoidUsingPositionalParameters',
-        'PSProvideCommentHelp'
+        'PSProvideCommentHelp',
+        'PSUseConsistentIndentation'
     )
 
     Rules               = @{
@@ -18,12 +19,6 @@
             Enable             = $true
             NewLineAfter       = $true
             IgnoreOneLineBlock = $false
-        }
-        PSUseConsistentIndentation                   = @{
-            Enable              = $true
-            Kind                = 'space'
-            IndentationSize     = 4
-            PipelineIndentation = 0
         }
         PSUseConsistentWhitespace                    = @{
             Enable                                  = $true
