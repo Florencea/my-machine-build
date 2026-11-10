@@ -372,7 +372,7 @@ To ensure high-efficiency human collaboration and maintain global code maintaina
 
 When authoring documentation for human engineers (`README.md`, architecture specs, user guides):
 
-- **Plain-Text Priority**: Use standard headings (`#`, `##`), clean prose paragraphs, and simple lists (`-`, `1.`). Avoid markdown tables, diagrams (Mermaid/ASCII flowcharts), and platform-specific markdown extensions (e.g. GitHub Alerts `> [!NOTE]`). Code blocks remain permitted for code and terminal commands.
+- **Plain-Text Priority & Silent Enforcement**: Use standard headings (`#`, `##`), clean prose paragraphs, and simple lists (`-`, `1.`). Avoid markdown tables, diagrams (Mermaid/ASCII flowcharts), and platform-specific markdown extensions (e.g. GitHub Alerts `> [!NOTE]`). Code blocks remain permitted for code and terminal commands. Enforce constraints silently; NEVER explain, declare, or justify formatting choices or terminal/reading environment suitability inside the document.
 - **Detect Source Language**: If the file is written in English, all edits and additions MUST be written in concise English.
 - **Zero Language Bleed**: NEVER inject Traditional Chinese or bilingual text into an existing English document.
 
@@ -556,4 +556,34 @@ Standalone documents are read by human engineers and must be completely decouple
 ## 系統 API 路由規格
 
 本文件定義使用者認證與權限檢驗端點之請求規格與回應結構。所有請求必須攜帶 Authorization: Bearer <token> 標頭，未通過驗證時回傳 401 Unauthorized。
+```
+
+### 7.9 Zero Meta-Declarations & Compliance Boilerplate in Documentation
+
+Standalone documents must contain pure domain content. Authoring rules, platform constraints, and formatting choices are instructions for the AI agent, NOT content to be declared in delivered engineering assets.
+
+#### Anti-Pattern (Compliance Disclaimer & Formatting Boilerplate)
+
+```markdown
+# Ascon 輕量化密碼演算法技術規格手冊
+
+本手冊說明 NIST SP 800-232 輕量化密碼學標準 Ascon 演算法系列在 Renesas RL78（R5F10BGG）16 位元微控制器環境下的規格。
+
+本文件依據純文字閱讀規範編寫，不使用 Markdown 表格、ASCII 圖形或平台專屬呼叫語法，適合終端機與純文字環境閱讀。
+```
+
+> **Why this fails**: Explaining how the document was authored or declaring that it avoids tables, diagrams, or styling is self-referential agent residue. Human engineers reading a technical manual require immediate domain substance without formatting disclaimers.
+
+#### Good Pattern (Direct Entry into Domain Specifications)
+
+```markdown
+# Ascon 輕量化密碼演算法技術規格手冊
+
+本手冊說明 NIST SP 800-232 輕量化密碼學標準 Ascon 演算法系列在 Renesas RL78（R5F10BGG）16 位元微控制器環境下的規格。
+
+---
+
+## 1. 演算法概述與標準背景
+
+Ascon 是由奧地利格拉茨科技大學等密碼學團隊設計的輕量化密碼學套件...
 ```
