@@ -354,39 +354,50 @@ tokei .
 
 ## 7. Concise Documentation & Dual-Language Protocol (Examples & Anti-Patterns)
 
-To ensure high-efficiency human collaboration and maintain global code maintainability, all documentation and code comments must strictly follow the dual-language separation and anti-hyperbole rules.
+To ensure high-efficiency human collaboration and maintain global code maintainability, all documentation, technical plans, and code comments must strictly follow the dual-mode separation, plain-text documentation priority, and anti-hyperbole rules.
 
 ### 7.1 Scope & Separation Matrix
 
-| Target Layer                                                                            | Required Language                                                                                                                                 | Tone & Style                                   | Prohibited Patterns                                                                           |
-| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------- | :-------------------------------------------------------------------------------------------- |
-| **In-Repo Project Docs** (`README.md`, `CHANGELOG.md`, specs, API docs)                 | **Primary Document Language** (Preserve existing; default concise English for open-source/English projects; Traditional Chinese only if targeted) | Direct, concise, structured, empirical         | Language mixing, injecting Traditional Chinese into English docs, emojis, marketing buzzwords |
-| **Agent Dialogue & Meta-Artifacts** (Chat replies, `/plan`, `/boost`, `walkthrough.md`) | **Traditional Chinese (繁體中文)**                                                                                                                | Direct, professional, technical                | Emojis, pleasantries, circular summaries, congratulatory remarks                              |
-| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)              | **Concise English**                                                                                                                               | High-signal, explains constraints & "why"      | Emojis, Chinese comments, non-English text, restating obvious syntax                          |
-| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                      | **Concise English**                                                                                                                               | Conventional Commits, imperative mood          | Emojis, Chinese text, vague messages (`fix bug`), verbose essays                              |
-| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths) | **Original Casing & Identifiers**                                                                                                                 | Preserved verbatim (e.g. `Vite+`, `node:path`) | Arbitrary translation or casing changes                                                       |
+| Target Layer                                                                            | Required Language                                                                                                                                 | Tone & Style                                                                                     | Prohibited Patterns                                                                                                           |
+| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| **In-Repo Project Docs** (`README.md`, `CHANGELOG.md`, specs, API docs)                 | **Primary Document Language** (Preserve existing; default concise English for open-source/English projects; Traditional Chinese only if targeted) | Plain-text priority, concise, structured, empirical                                              | Tables, diagrams (Mermaid/ASCII), platform callouts (`> [!NOTE]`), forced trade-off boilerplate, dialogue leakage, agent logs |
+| **Agent Dialogue & Meta-Artifacts** (Chat replies, `/plan`, `/boost`, `walkthrough.md`) | **Traditional Chinese (繁體中文)**                                                                                                                | Direct, technical; proposals & `/plan` explicitly evaluate hard constraints, trade-offs & limits | Emojis, pleasantries, circular summaries, congratulatory remarks                                                              |
+| **Source Code & Comments** (`.ts`, `.ps1`, `.sh`, `.c`, `.h`, `.py`, etc.)              | **Concise English**                                                                                                                               | High-signal, explains constraints & "why"                                                        | Emojis, Chinese comments, non-English text, restating obvious syntax                                                          |
+| **Git Commits & Branches** (`feat(...)`, `fix(...)`, branch names)                      | **Concise English**                                                                                                                               | Conventional Commits, imperative mood                                                            | Emojis, Chinese text, vague messages (`fix bug`), verbose essays                                                              |
+| **Technical Identifiers** (CLI tools, commands, package names, code symbols, API paths) | **Original Casing & Identifiers**                                                                                                                 | Preserved verbatim (e.g. `Vite+`, `node:path`)                                                   | Arbitrary translation or casing changes                                                                                       |
 
-### 7.2 Document Language Preservation & Human-Facing Documentation Patterns
+### 7.2 Plain-Text Human-Facing Documentation Patterns
 
-#### In-Place Modification Rule (Language Preservation)
+#### Plain-Text Priority & Minimalist Syntax
 
-When editing or updating existing repository documentation (`README.md`, architectural specs, API documentation):
+When authoring documentation for human engineers (`README.md`, architecture specs, user guides):
 
+- **Plain-Text Priority**: Use standard headings (`#`, `##`), clean prose paragraphs, and simple lists (`-`, `1.`). Avoid markdown tables, diagrams (Mermaid/ASCII flowcharts), and platform-specific markdown extensions (e.g. GitHub Alerts `> [!NOTE]`). Code blocks remain permitted for code and terminal commands.
 - **Detect Source Language**: If the file is written in English, all edits and additions MUST be written in concise English.
 - **Zero Language Bleed**: NEVER inject Traditional Chinese or bilingual text into an existing English document.
-- **Traditional Chinese Projects & Meta-Artifacts**: When authoring documentation specifically targeted at Traditional Chinese readers, or when generating agent meta-artifacts in chat, strictly adhere to the concise, non-hyperbolic patterns below.
 
-#### Anti-Pattern (Hyperbolic, Fluffy & Low Signal)
+#### Anti-Pattern (Markdown Table & Alert Clutter)
 
-```markdown
-# 革命性的終極快取管理系統！
+````markdown
+# Cache Architecture
 
-這是一個令人驚嘆且無與倫比的強大解決方案！正如大家所知，快取管理一直是業界最艱難的挑戰之一。
-我們非常高興地宣布，透過這套完美的架構，您可以毫不費力地獲得難以置信的超高速體驗！
-本模組徹底顛覆了傳統做法，帶來前所未有的極致效能，讓您的專案如虎添翼！
+> [!NOTE]
+> This module manages cache invalidation.
+
+| Property | Value  | Description               |
+| :------- | :----- | :------------------------ |
+| Driver   | Redis  | Distributed cache storage |
+| Timeout  | 5000ms | Connection timeout        |
+
+```mermaid
+graph TD
+  A[Client] --> B[Redis]
 ```
+````
 
-#### Good Pattern (Concise, Technical & Grounded in Traditional Chinese)
+````
+
+#### Good Pattern (Clean, High-Readability Plain Text with Lists)
 
 ```markdown
 # 跨平台工作快取架構
@@ -395,10 +406,10 @@ When editing or updating existing repository documentation (`README.md`, archite
 
 ## 特性與不變性
 
-- **增量比對**：以 `hashFiles('pnpm-lock.yaml')` 與原始碼 AST 雜湊決定是否命中快取。
-- **失效機制**：工作區設定或相依套件變更時自動失效並強制重新編譯。
-- **儲存邊界**：本機快取目錄限制於 `node_modules/.vite/task-cache`，不污染全域環境。
-```
+- 增量比對：以 hashFiles('pnpm-lock.yaml') 與原始碼 AST 雜湊決定是否命中快取。
+- 失效機制：工作區設定或相依套件變更時自動失效並強制重新編譯。
+- 儲存邊界：本機快取目錄限制於 node_modules/.vite/task-cache，不污染全域環境。
+````
 
 ### 7.3 In-Code Comments: Anti-Patterns vs. Good Patterns
 
@@ -458,7 +469,7 @@ if (!session.isActive()) {
 - ⚠️ 注意：切勿直接執行 commit ❌
 ```
 
-#### Good Pattern (Clean, Professional & Pure Markdown)
+#### Good Pattern (Clean, Professional Plain Markdown)
 
 ```markdown
 # 快速開始指南
@@ -467,9 +478,7 @@ if (!session.isActive()) {
 
 1. 執行 `vp install` 安裝相依套件。
 2. 權限設定：確認環境已正確配置存取權杖。
-
-> [!WARNING]
-> 嚴禁由 Agent 直接執行 git commit。請於完成暫存後交由工程師手動提交。
+3. 提交規範：嚴禁由 Agent 直接執行 git commit，完成暫存後交由工程師手動提交。
 ```
 
 ### 7.6 Document Self-Containment: Resolving Contextual Dangling on Revision
@@ -495,52 +504,50 @@ When asked in chat to modify or update an existing document, agents often make t
 
 ### 樂觀並行控制規格
 
-為防止更新遺失，快取資料結構包含 `version: number` 欄位：
+為防止更新遺失，快取資料結構包含 version: number 欄位：
 
 - 讀取時獲取當前版本號。
-- 寫入時執行原子比較（CAS）：若資料庫目前版本號等於讀取版本號，則更新並將 `version` 遞增 1；若版本不符，拋出 `OptimisticLockException` 並由呼叫端重試。
+- 寫入時執行原子比較（CAS）：若資料庫目前版本號等於讀取版本號，則更新並將 version 遞增 1；若版本不符，拋出 OptimisticLockException 並由呼叫端重試。
 ```
 
-### 7.7 Anti-Sycophancy: Mandatory Trade-off Matrix vs. "Current Way is the Best"
+### 7.7 Anti-Sycophancy: Planning/Q&A Trade-Offs vs. Lean Documentation Invariant
 
-Keywords blacklists fail because LLMs simply switch to rephrased superlatives ("the most ideal choice", "demonstrating unmatched advantages"). The only engineering solution is the **Mandatory Trade-off Protocol**: every proposal must explicitly state costs, drawbacks, and anti-use cases.
+- **Interactive Proposals & Planning (`/plan`, `/boost`, Technical Q&A)**: The agent MUST evaluate hard constraints, trade-offs, and anti-use cases to prevent sycophancy and single-sided advocacy.
+- **Standalone Human-Facing Documentation**: Do NOT mandate trade-off matrices or anti-use cases sections in written documents. Forcing trade-off boilerplate into production specs or guides produces redundant noise. State technical specifications, invariants, and procedures directly.
 
-#### Anti-Pattern (Sales Pitch, Self-Praise & Single-Sided Advocacy)
-
-```markdown
-## 快取技術選型
-
-我們經過深入評估，採用 Redis 是目前最棒、最理想的極佳選擇！該設計不僅非常優雅，而且能帶來令人驚嘆的極致低延遲，完美解決專案所有效能瓶頸。
-```
-
-#### Good Pattern (Objective Engineering Trade-off with Costs & Anti-Use Cases)
+#### Anti-Pattern (Forcing Trade-Off Matrix Boilerplate into a Standard User Spec)
 
 ```markdown
-## 記憶體快取架構選型
-
-### 選用技術：Redis
-
-為滿足「跨微服務節點共享快取狀態」與「讀取延遲 < 5ms」之硬性約束，選用 Redis 作為分散式快取儲存。
+## 系統記錄檔規格
 
 ### 引入代價與妥協 (Incurred Trade-offs & Costs)
 
-- **維護複雜度**：需額外維護 Redis 叢集高可用性（Sentinel / Cluster）及監控警報機制。
-- **網路額外開銷**：相較於行程內記憶體快取（如 In-Memory LRU），每次讀取多出單趟 TCP 網路往返（約 1~2ms）。
-- **序列化成本**：所有物件儲存與提取皆需經歷 JSON 或二進位序列化與反序列化。
+- 磁碟空間開銷：每日產出 50MB 記錄檔。
+- 寫入延遲：每次記錄呼叫消耗 0.1ms。
 
 ### 不適用場景 (Anti-Use Cases)
 
-- 單機獨立執行且無跨行程共享需求之 CLI 工具（此情境應使用行程內記憶體快取，避免不必要的外部相依）。
+- 磁碟容量小於 100MB 之嵌入式設備。
 ```
 
-### 7.8 Zero Dialogue Leakage: Standalone Spec vs. Chat Residue
-
-#### Anti-Pattern (Conversational Leakage into Document)
+#### Good Pattern (Direct, Lean Engineering Specification)
 
 ```markdown
-## 說明
+## 系統記錄檔規格
 
-回答您的問題，我已經為您規劃好 API 路由結構，請您確認下方內容是否符合您的需求...
+應用程式記錄檔統一寫入 /var/log/app/service.log，採用 JSON-Lines 格式並包含 timestamp、level 與 trace_id 欄位。系統每 24 小時輪替一次記錄檔，保留最近 7 天之壓縮封存檔。
+```
+
+### 7.8 Zero Dialogue & Agent Action Residue in Documentation
+
+Standalone documents are read by human engineers and must be completely decoupled from the AI agent's chat session and execution history.
+
+#### Anti-Pattern (Conversational Leakage & Agent Action Logs)
+
+```markdown
+## API 路由規格
+
+回答您的問題，我已經為您規劃好 API 路由結構。另外，我剛才執行了 `vp check` 檢查了型別，並修改了 `src/routes.ts` 檔案，請您確認下方內容是否符合您的需求...
 ```
 
 #### Good Pattern (Third-Person Impersonal Standalone Spec)
@@ -548,5 +555,5 @@ Keywords blacklists fail because LLMs simply switch to rephrased superlatives ("
 ```markdown
 ## 系統 API 路由規格
 
-本文件定義使用者認證與權限檢驗端點之請求規格與回應結構。
+本文件定義使用者認證與權限檢驗端點之請求規格與回應結構。所有請求必須攜帶 Authorization: Bearer <token> 標頭，未通過驗證時回傳 401 Unauthorized。
 ```

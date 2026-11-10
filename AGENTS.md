@@ -59,15 +59,20 @@ Before staging any files, all modified files must be formatted and verified:
 
 ## 4. Documentation, Language & Communication Standards
 
-- **Dual-Mode Language Separation**:
-  - **Dialogue & Review Artifacts (Traditional Chinese)**: Conversational chat responses, implementation plans (`<plan_name>.md`), walkthrough artifacts (`walkthrough.md`), and commit explanations are written in strict Traditional Chinese (臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化; 嚴禁簡體用語). Standard technical identifiers, flags, and symbols retain their English casing (`pnpm`, `Vite+`, `tsconfig.json`).
-  - **Code, Comments & Commits (Concise English)**: Source code, identifiers, inline comments, docstrings, and Git commit messages must be written in concise, grammatical English. Never include Chinese or non-English characters in code comments or commits.
+- **Dual-Mode Separation & Context Boundaries**:
+  - **Mode A: Dialogue, Planning & Technical Q&A**: Conversational chat responses, implementation plans (`<plan_name>.md`), walkthrough artifacts (`walkthrough.md`), and commit explanations are written in strict Traditional Chinese (臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化; 嚴禁簡體用語). In technical planning (`/plan`, `/boost`) and proposals, explicitly evaluate satisfied constraints, design trade-offs, and anti-use cases.
+  - **Mode B: Human-Facing Document Authoring (Standalone Assets)**:
+    - **Plain-Text Priority**: Prioritize clean plain text with standard headings and lists. Avoid markdown tables, diagrams (Mermaid/ASCII), and platform-specific markdown syntax (e.g. callout alerts `> [!NOTE]`). Code blocks remain permitted for code and terminal commands.
+    - **Zero Dialogue & Agent Residue**: Strictly prohibit conversational answers ("In response to your query..."), agent action logs ("The agent executed X..."), and first/second-person pronouns. Deliver concise, third-person engineering specifications.
+    - **No Forced Trade-Off Boilerplate**: Do not mandate trade-off matrices or anti-use cases sections in written documents; focus directly on specifications, invariants, and procedures without padding.
+- **Code, Comments & Commits (Concise English)**: Source code, identifiers, inline comments, docstrings, and Git commit messages must be written in concise, grammatical English. Never include Chinese or non-English characters in code comments or commits. Technical identifiers, flags, and symbols retain verbatim English casing (`pnpm`, `Vite+`, `tsconfig.json`).
 - **Objective Fact-First Syntax & Strict Ban on Emojis**:
   - Prohibit marketing superlatives ("best", "optimal", "flawless", "revolutionary", "blazingly fast", "最佳", "首選", "卓越", "強大") and self-congratulatory praise ("elegant", "robust", "perfect", "優雅", "健全").
   - Express facts through verbs, physical conditions, and measurable metrics.
   - Strictly prohibit emojis (🚀, 💡, ✨, 👉, ❌, ✅, 🎉, etc.) and informal emoticons across all outputs.
 - **Document Language Preservation & Offline Reader Test**:
-  - Preserve the primary language of existing files. Write documentation under the invariant that the reader is an offline engineer with zero chat history context. Explicitly state technical context and problem definitions; avoid dangling references ("as discussed earlier").
+  - Preserve the primary language of existing files (concise English by default; Traditional Chinese only if targeted).
+  - Standalone documentation (`*.md`, specs, READMEs) must be completely self-contained for offline readers without assuming chat history or prior conversation.
 
 ---
 

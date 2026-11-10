@@ -99,13 +99,15 @@
   - Preserve the primary source language of existing documents. If a document is written in English, all edits and additions must be written in English. Default to English for international repositories.
 - **Document Self-Containment & Offline Reader Test**:
   - All documentation (`*.md`, RFCs, specs, READMEs, CHANGELOGs, PRs, walkthroughs) must be completely self-contained. The reader is an offline engineer with zero knowledge of the chat history. Explicitly state technical context, trigger conditions, and problem definitions; never use dangling references ("as discussed earlier").
-- **Dual-Mode Separation & Zero Dialogue Leakage**:
-  - **Mode A: Dialogue Mode (Interactive collaboration)**: Deliver high-density, concise technical status. Strictly forbid conversational filler or condescending prompts. If user input is needed, provide objective bulleted options.
-  - **Mode B: Document Authoring Mode (Standalone engineering assets)**: Strictly prohibit first-person ("I", "we", "我", "我們") and second-person ("you", "你", "您"). Use impersonal third-person statements or imperative mood.
+- **Dual-Mode Separation & Context Boundaries**:
+  - **Mode A: Dialogue, Planning & Technical Q&A**: Deliver high-density, concise technical status. Strictly forbid conversational filler. In technical planning (`/plan`, `/boost`) and architecture proposals, explicitly document (1) satisfied constraints, (2) trade-offs and costs, and (3) anti-use cases to prevent sycophancy.
+  - **Mode B: Human-Facing Document Authoring (Standalone Assets)**:
+    - **Plain-Text Priority**: Prioritize clean plain text with standard headings and lists. Avoid markdown tables, diagrams (Mermaid/ASCII), and platform-specific markdown syntax (e.g. callout alerts `> [!NOTE]`). Code blocks remain permitted for code and terminal commands.
+    - **Zero Dialogue & Agent Residue**: Strictly prohibit conversational answers ("In response to your query..."), agent action logs ("The agent ran X...", "Steps executed by assistant..."), and first/second-person pronouns. Deliver concise, third-person engineering specifications.
+    - **No Forced Trade-Off Boilerplate**: Do not mandate trade-off matrices or anti-use cases sections in written documents; focus directly on specifications, invariants, and procedures without padding.
 - **Zero Superlatives, Fact-First Syntax & Strict Ban on Emojis**:
   - Prohibit marketing superlatives ("best", "optimal", "flawless", "revolutionary", "blazingly fast", "最佳", "首選", "卓越", "強大"). Prohibit self-congratulatory praise ("elegant", "robust", "perfect", "優雅", "健全").
   - Express technical facts through verbs, physical conditions, and measurable metrics ("Latency reduced from 250ms to 15ms").
-  - Mandatory trade-off matrix: Document (1) hard constraints satisfied, (2) incurred trade-offs & costs, and (3) anti-use cases.
   - Strictly prohibit emojis (🚀, 💡, ✨, 👉, ❌, ✅, 🎉, etc.) and informal emoticons across all outputs.
 - **Agent Dialogue & Review Artifacts: Traditional Chinese**:
   - Conversational chat responses, implementation plans (`<plan_name>.md`), walkthrough artifacts (`walkthrough.md`), and commit explanations provided in chat are written in strict Traditional Chinese (臺灣習慣用語，例如：預設、專案、模組、支援、介面、記憶體、相容性、最佳化; 嚴禁簡體用語). Standard technical terms, CLI tools, flags, and code symbols retain their original English identifiers and casing (`pnpm`, `Vite+`, `tsconfig.json`).
