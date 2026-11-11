@@ -134,6 +134,30 @@ function Invoke-Step {
     }
 }
 
+function Restore-GitHubWorkflow {
+    # Prevent vp migrate from pinning floating setup-vp@v1 tags in CI workflows.
+    if (-not (Test-Path -LiteralPath '.github' -PathType Container)) {
+        return
+    }
+
+    $diffLines = @(& git -c core.quotePath=false diff --relative --name-only -- '.github' 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to inspect GitHub Actions workflow changes after vp migrate'
+    }
+
+    $changedWorkflowFiles = @($diffLines | Where-Object {
+            $_ -imatch '^\.github/(workflows/[^/]+\.ya?ml|(.+/)?action\.ya?ml)$'
+        })
+    if ($changedWorkflowFiles.Count -eq 0) {
+        return
+    }
+
+    & git checkout -q -- @changedWorkflowFiles
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to restore GitHub Actions workflow files after vp migrate'
+    }
+}
+
 $pkgJson = Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json -AsHashtable
 $deps = $pkgJson['dependencies'] ?? @{}
 $devDeps = $pkgJson['devDependencies'] ?? @{}
@@ -210,6 +234,9 @@ try {
     if ($isVitePlus) {
         $failedStep = 'vp migrate --no-interactive'
         Invoke-Step -Message 'Aligning Vite+ toolchain (vp migrate)' -Exe 'vp' -Arguments @('migrate', '--no-interactive')
+
+        $failedStep = 'Restore GitHub Actions workflows'
+        Restore-GitHubWorkflow
 
         if ($ncuMap.Count -gt 0) {
             $failedStep = 'vpx npm-check-updates'
