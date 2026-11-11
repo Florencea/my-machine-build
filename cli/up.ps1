@@ -1,9 +1,9 @@
 #!/usr/bin/env -S pwsh -NoLogo -NoProfile
 <#
 .SYNOPSIS
-    Check and update Node.js / Vite+ package dependencies with automated verification and rollback.
+    Check and update Node.js / Vite+ package dependencies and GitHub Actions major versions with automated verification and rollback.
 .DESCRIPTION
-    Cross-platform Node.js dependency updater for macOS and Windows 11 (PowerShell 7).
+    Cross-platform Node.js dependency and GitHub Actions updater for macOS and Windows 11 (PowerShell 7).
 #>
 
 Set-StrictMode -Version Latest
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 
 function Show-Help {
     Write-Output @'
-up: Check and update Node.js package dependencies with clean spinner feedback
+up: Check and update Node.js package dependencies and GitHub Actions major versions with clean spinner feedback
 Usage: up
 '@
 }
@@ -158,6 +158,228 @@ function Restore-GitHubWorkflow {
     }
 }
 
+function Find-GitHubActionFile {
+    if (-not (Test-Path -LiteralPath '.github' -PathType Container)) {
+        return @()
+    }
+
+    $repoRoot = (Resolve-Path -LiteralPath '.').Path
+    $githubDir = (Resolve-Path -LiteralPath '.github').Path
+    $files = @(Get-ChildItem -LiteralPath $githubDir -Recurse -File | Where-Object {
+            $_.Extension -in @('.yml', '.yaml')
+        })
+
+    $matched = [System.Collections.Generic.List[string]]::new()
+    foreach ($file in $files) {
+        $relPath = [System.IO.Path]::GetRelativePath($repoRoot, $file.FullName) -replace '\\', '/'
+        if ($relPath -imatch '^\.github/(workflows/[^/]+\.ya?ml|(.+/)?action\.ya?ml)$') {
+            $matched.Add($relPath)
+        }
+    }
+    return @($matched | Sort-Object)
+}
+
+function Get-GitHubActionReference {
+    param(
+        [string[]]$FilePaths = @()
+    )
+
+    $references = [System.Collections.Generic.List[hashtable]]::new()
+    $yqQuery = '[(.jobs[]?.uses, .jobs[]?.steps[]?.uses, .runs?.steps[]?.uses) | select(. != null and tag == "!!str") | {"uses": ., "line": line}]'
+
+    foreach ($relPath in $FilePaths) {
+        $absPath = (Resolve-Path -LiteralPath $relPath).Path
+        $rawJson = (& yq -o=json $yqQuery $absPath 2>&1) -join "`n"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to parse YAML file '${relPath}': $rawJson"
+        }
+
+        if (-not $rawJson -or $rawJson.Trim() -in @('', '[]')) {
+            continue
+        }
+
+        $items = @($rawJson | ConvertFrom-Json -AsHashtable)
+        foreach ($item in $items) {
+            $usesValue = [string]($item['uses'] ?? '')
+            if (-not $usesValue -or $usesValue.StartsWith('.') -or $usesValue.StartsWith('docker://') -or (-not $usesValue.Contains('@'))) {
+                continue
+            }
+
+            if ($usesValue -match '^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/([^@]+))?@(.+)$') {
+                $repoSlug = $Matches[1]
+                $subpath = $Matches[2]
+                $currentRef = $Matches[3]
+
+                if ($currentRef -match '^v(\d+)(?:\.\d+(?:\.\d+)?)?$') {
+                    $currentMajor = [int]$Matches[1]
+                    $actionTarget = $subpath ? "$repoSlug/$subpath" : $repoSlug
+                    $references.Add(@{
+                            FilePath     = $relPath
+                            Line         = [int]$item['line']
+                            OldUses      = $usesValue
+                            RepoSlug     = $repoSlug
+                            ActionTarget = $actionTarget
+                            CurrentRef   = $currentRef
+                            CurrentMajor = $currentMajor
+                        })
+                }
+            }
+        }
+    }
+
+    return @($references)
+}
+
+function Resolve-GitHubActionMajorVersion {
+    param(
+        [string[]]$RepoSlugs = @()
+    )
+
+    $uniqueRepos = @($RepoSlugs | Sort-Object -Unique)
+    $resultMap = @{}
+    if ($uniqueRepos.Count -eq 0) {
+        return $resultMap
+    }
+
+    $prevTerminalPrompt = $env:GIT_TERMINAL_PROMPT
+    $env:GIT_TERMINAL_PROMPT = '0'
+    try {
+        $results = @($uniqueRepos | ForEach-Object -Parallel {
+                $slug = $_
+                $output = @(& git -c credential.interactive=never ls-remote --tags --refs "https://github.com/$slug.git" 2>&1)
+                $code = $LASTEXITCODE
+                if ($code -ne 0) {
+                    $errLine = ($output | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() } | Select-Object -First 1) ?? "exit code $code"
+                    [PSCustomObject]@{
+                        RepoSlug    = $slug
+                        Success     = $false
+                        LatestMajor = $null
+                        Error       = $errLine
+                    }
+                    return
+                }
+
+                $maxMajor = $null
+                foreach ($line in $output) {
+                    $text = [string]$line
+                    if ($text -match '\trefs/tags/v(\d+)$') {
+                        $ver = [int]$Matches[1]
+                        if ($null -eq $maxMajor -or $ver -gt $maxMajor) {
+                            $maxMajor = $ver
+                        }
+                    }
+                }
+
+                [PSCustomObject]@{
+                    RepoSlug    = $slug
+                    Success     = $true
+                    LatestMajor = $maxMajor
+                    Error       = ''
+                }
+            } -ThrottleLimit 6)
+    }
+    finally {
+        $env:GIT_TERMINAL_PROMPT = $prevTerminalPrompt
+    }
+
+    foreach ($res in $results) {
+        $resultMap[$res.RepoSlug] = $res
+    }
+
+    return $resultMap
+}
+
+function Get-GitHubActionUpdate {
+    param(
+        [hashtable[]]$References = @(),
+        [hashtable]$LatestMajorByRepo = @{}
+    )
+
+    $updates = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($refItem in $References) {
+        $slug = [string]$refItem['RepoSlug']
+        if (-not $LatestMajorByRepo.ContainsKey($slug)) {
+            continue
+        }
+
+        $latestMajor = [int]$LatestMajorByRepo[$slug]
+        $currentMajor = [int]$refItem['CurrentMajor']
+        $currentRef = [string]$refItem['CurrentRef']
+        $targetRef = "v$latestMajor"
+
+        if (($latestMajor -ge $currentMajor) -and ($currentRef -ne $targetRef)) {
+            $actionTarget = [string]$refItem['ActionTarget']
+            $updates.Add(@{
+                    FilePath     = [string]$refItem['FilePath']
+                    Line         = [int]$refItem['Line']
+                    OldUses      = [string]$refItem['OldUses']
+                    NewUses      = "$actionTarget@$targetRef"
+                    RepoSlug     = $slug
+                    ActionTarget = $actionTarget
+                    OldRef       = $currentRef
+                    NewRef       = $targetRef
+                })
+        }
+    }
+
+    return @($updates)
+}
+
+function Update-GitHubActionFile {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([object[]])]
+    param(
+        [hashtable[]]$Updates = @()
+    )
+
+    $changedFiles = [System.Collections.Generic.List[string]]::new()
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $grouped = $Updates | Group-Object -Property { $_['FilePath'] }
+
+    foreach ($group in $grouped) {
+        $relPath = [string]$group.Name
+        $absPath = (Resolve-Path -LiteralPath $relPath).Path
+        $raw = [System.IO.File]::ReadAllText($absPath)
+        $eol = $raw.Contains("`r`n") ? "`r`n" : "`n"
+        $lines = [string[]]($raw -split '\r?\n')
+        $fileModified = $false
+
+        foreach ($item in $group.Group) {
+            $lineIndex = [int]$item['Line'] - 1
+            if ($lineIndex -lt 0 -or $lineIndex -ge $lines.Count) {
+                throw "Line index $($item['Line']) out of range for '$relPath'"
+            }
+
+            $oldUses = [string]$item['OldUses']
+            $newUses = [string]$item['NewUses']
+            $safeReplacement = $newUses.Replace('$', '$$')
+            $escapedOld = [regex]::Escape($oldUses)
+            $usesPattern = '(?<=uses\s*:\s*[''"]?)' + $escapedOld + '(?=[''"]?(?:\s+#.*|\s*$))'
+            $fallbackPattern = '(?<=^\s*[''"]?)' + $escapedOld + '(?=[''"]?(?:\s+#.*|\s*$))'
+            $lineText = $lines[$lineIndex]
+
+            if ($lineText -match $usesPattern) {
+                $lines[$lineIndex] = [regex]::new($usesPattern).Replace($lineText, $safeReplacement, 1)
+                $fileModified = $true
+            }
+            elseif ($lineText -match $fallbackPattern) {
+                $lines[$lineIndex] = [regex]::new($fallbackPattern).Replace($lineText, $safeReplacement, 1)
+                $fileModified = $true
+            }
+            else {
+                throw "Failed to locate uses target '$oldUses' at ${relPath}:$($item['Line'])"
+            }
+        }
+
+        if ($fileModified -and $PSCmdlet.ShouldProcess($relPath, 'Update GitHub Actions major version references')) {
+            [System.IO.File]::WriteAllText($absPath, ($lines -join $eol), $utf8NoBom)
+            $changedFiles.Add($relPath)
+        }
+    }
+
+    return @($changedFiles)
+}
+
 $pkgJson = Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json -AsHashtable
 $deps = $pkgJson['dependencies'] ?? @{}
 $devDeps = $pkgJson['devDependencies'] ?? @{}
@@ -198,12 +420,55 @@ if ($ncuRaw -and $ncuRaw.Trim() -notin @('', '{}')) {
     $ncuMap = $ncuRaw | ConvertFrom-Json -AsHashtable
 }
 
-if ((-not $isVitePlus -or -not $vpToolchainUpgraded) -and ($ncuMap.Count -eq 0)) {
+$hasDepUpdates = ($isVitePlus -and $vpToolchainUpgraded) -or ($ncuMap.Count -gt 0)
+
+$ciFiles = @(Find-GitHubActionFile)
+$latestMajorByRepo = @{}
+$ciUpdates = @()
+$ciDisplayEntries = [System.Collections.Generic.List[hashtable]]::new()
+$seenCiDisplayKeys = [System.Collections.Generic.HashSet[string]]::new()
+
+if ($ciFiles.Count -gt 0) {
+    $ciRefs = @(Get-GitHubActionReference -FilePaths $ciFiles)
+    if ($ciRefs.Count -gt 0) {
+        $repoSlugs = @($ciRefs | ForEach-Object { $_['RepoSlug'] })
+        $repoResults = Resolve-GitHubActionMajorVersion -RepoSlugs $repoSlugs
+
+        foreach ($slug in ($repoSlugs | Sort-Object -Unique)) {
+            $res = $repoResults[$slug]
+            if (-not $res.Success) {
+                [Console]::Error.WriteLine("Warning: Failed to query tags for ${slug}: $($res.Error)")
+            }
+            elseif ($null -ne $res.LatestMajor) {
+                $latestMajorByRepo[$slug] = [int]$res.LatestMajor
+            }
+        }
+
+        $ciUpdates = @(Get-GitHubActionUpdate -References $ciRefs -LatestMajorByRepo $latestMajorByRepo)
+        foreach ($updateItem in $ciUpdates) {
+            $actionTarget = [string]$updateItem['ActionTarget']
+            $currentRef = [string]$updateItem['OldRef']
+            $targetRef = [string]$updateItem['NewRef']
+            $displayKey = "$actionTarget|$currentRef|$targetRef"
+            if ($seenCiDisplayKeys.Add($displayKey)) {
+                $ciDisplayEntries.Add(@{
+                        Target = $actionTarget
+                        OldRef = $currentRef
+                        NewRef = $targetRef
+                    })
+            }
+        }
+    }
+}
+
+$hasCiUpdates = $ciUpdates.Count -gt 0
+
+if ((-not $hasDepUpdates) -and (-not $hasCiUpdates)) {
     exit 0
 }
 
-$count = 0
-$commitBodyLines = [System.Collections.Generic.List[string]]::new()
+$depCount = 0
+$depCommitBodyLines = [System.Collections.Generic.List[string]]::new()
 $singlePkgSummary = ''
 $hasVitePlusInTargets = $false
 
@@ -214,137 +479,206 @@ foreach ($pkg in $ncuMap.Keys) {
         $hasVitePlusInTargets = $true
     }
     Write-Output "  $pkg  $oldVer  ->  $newVer"
-    $commitBodyLines.Add("- ${pkg}: ${oldVer} -> ${newVer}")
+    $depCommitBodyLines.Add("- ${pkg}: ${oldVer} -> ${newVer}")
     $singlePkgSummary = "$pkg $oldVer -> $newVer"
-    $count++
+    $depCount++
 }
 
 if ($vpToolchainUpgraded -and (-not $hasVitePlusInTargets)) {
     Write-Output "  vite-plus  $vpOldVer  ->  $vpNewVer"
-    $commitBodyLines.Add("- vite-plus: ${vpOldVer} -> ${vpNewVer}")
+    $depCommitBodyLines.Add("- vite-plus: ${vpOldVer} -> ${vpNewVer}")
     $singlePkgSummary = "vite-plus $vpOldVer -> $vpNewVer"
-    $count++
+    $depCount++
+}
+
+$ciCount = 0
+$ciCommitBodyLines = [System.Collections.Generic.List[string]]::new()
+$singleCiSummary = ''
+
+foreach ($entry in $ciDisplayEntries) {
+    Write-Output "  $($entry['Target'])  $($entry['OldRef'])  ->  $($entry['NewRef'])"
+    $ciCommitBodyLines.Add("- $($entry['Target']): $($entry['OldRef']) -> $($entry['NewRef'])")
+    $singleCiSummary = "$($entry['Target']) $($entry['OldRef']) -> $($entry['NewRef'])"
+    $ciCount++
 }
 
 $tempBranch = "chore/deps-upgrade-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 & git checkout -q -b $tempBranch
 $failedStep = 'Verification'
+$createdCommits = [System.Collections.Generic.List[string]]::new()
 
 try {
-    if ($isVitePlus) {
-        $failedStep = 'vp migrate --no-interactive'
-        Invoke-Step -Message 'Aligning Vite+ toolchain (vp migrate)' -Exe 'vp' -Arguments @('migrate', '--no-interactive')
+    if ($hasDepUpdates) {
+        if ($isVitePlus) {
+            $failedStep = 'vp migrate --no-interactive'
+            Invoke-Step -Message 'Aligning Vite+ toolchain (vp migrate)' -Exe 'vp' -Arguments @('migrate', '--no-interactive')
 
-        $failedStep = 'Restore GitHub Actions workflows'
-        Restore-GitHubWorkflow
+            $failedStep = 'Restore GitHub Actions workflows'
+            Restore-GitHubWorkflow
 
-        if ($ncuMap.Count -gt 0) {
-            $failedStep = 'vpx npm-check-updates'
-            Invoke-Step -Message 'Updating packages (NCU)' -Exe 'vpx' -Arguments @('-s', 'npm-check-updates@latest', '-u', '-t', 'minor')
+            if ($ncuMap.Count -gt 0) {
+                $failedStep = 'vpx npm-check-updates'
+                Invoke-Step -Message 'Updating packages (NCU)' -Exe 'vpx' -Arguments @('-s', 'npm-check-updates@latest', '-u', '-t', 'minor')
+            }
+
+            $failedStep = 'vp pm pkg fix'
+            Invoke-Step -Message 'Normalizing manifest (vp pm pkg fix)' -Exe 'vp' -Arguments @('pm', 'pkg', 'fix')
+
+            $failedStep = 'vp install'
+            Invoke-Step -Message 'Syncing dependencies (vp install)' -Exe 'vp' -Arguments @('install')
+
+            $failedStep = 'vp install (frozen verification)'
+            Invoke-Step -Message 'Verifying frozen lockfile' -Exe 'vp' -Arguments @('install', '--frozen-lockfile')
+        }
+        else {
+            if ($ncuMap.Count -gt 0) {
+                $failedStep = 'vpx npm-check-updates'
+                Invoke-Step -Message 'Updating packages (NCU)' -Exe 'vpx' -Arguments @('-s', 'npm-check-updates@latest', '-u', '-t', 'minor')
+            }
+
+            $failedStep = 'vp pm pkg fix'
+            Invoke-Step -Message 'Normalizing manifest (vp pm pkg fix)' -Exe 'vp' -Arguments @('pm', 'pkg', 'fix')
+
+            if (Test-Path -LiteralPath 'node_modules' -PathType Container) {
+                Move-Item -LiteralPath 'node_modules' -Destination '.node_modules.bak' -Force
+            }
+            Remove-Item -LiteralPath 'package-lock.json' -Force -ErrorAction SilentlyContinue
+
+            $failedStep = 'vp install (lockfile update)'
+            Invoke-Step -Message 'Writing lockfile' -Exe 'vp' -Arguments @('install', '--lockfile-only', '--ignore-scripts')
+
+            $failedStep = 'vp install'
+            Invoke-Step -Message 'Syncing dependencies (vp install)' -Exe 'vp' -Arguments @('install', '--frozen-lockfile')
+            Remove-Item -LiteralPath '.node_modules.bak' -Recurse -Force -ErrorAction SilentlyContinue
         }
 
-        $failedStep = 'vp pm pkg fix'
-        Invoke-Step -Message 'Normalizing manifest (vp pm pkg fix)' -Exe 'vp' -Arguments @('pm', 'pkg', 'fix')
+        # Re-read package.json scripts after migration/update
+        $pkgJson = Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json -AsHashtable
+        $deps = $pkgJson['dependencies'] ?? @{}
+        $devDeps = $pkgJson['devDependencies'] ?? @{}
+        $scriptsMap = $pkgJson['scripts'] ?? @{}
 
-        $failedStep = 'vp install'
-        Invoke-Step -Message 'Syncing dependencies (vp install)' -Exe 'vp' -Arguments @('install')
+        $failedStep = 'vp fmt'
+        Invoke-Step -Message 'Formatting code & configs (vp fmt)' -Exe 'vp' -Arguments @('fmt')
 
-        $failedStep = 'vp install (frozen verification)'
-        Invoke-Step -Message 'Verifying frozen lockfile' -Exe 'vp' -Arguments @('install', '--frozen-lockfile')
-    }
-    else {
-        if ($ncuMap.Count -gt 0) {
-            $failedStep = 'vpx npm-check-updates'
-            Invoke-Step -Message 'Updating packages (NCU)' -Exe 'vpx' -Arguments @('-s', 'npm-check-updates@latest', '-u', '-t', 'minor')
+        if ($hasCiUpdates) {
+            $failedStep = 'Restore GitHub Actions workflows before deps commit'
+            Restore-GitHubWorkflow
         }
 
-        $failedStep = 'vp pm pkg fix'
-        Invoke-Step -Message 'Normalizing manifest (vp pm pkg fix)' -Exe 'vp' -Arguments @('pm', 'pkg', 'fix')
+        $failedStep = 'vp check'
+        Invoke-Step -Message 'Checking quality & lint (vp check)' -Exe 'vp' -Arguments @('check', '--quiet', '--no-error-on-unmatched-pattern')
 
-        if (Test-Path -LiteralPath 'node_modules' -PathType Container) {
-            Move-Item -LiteralPath 'node_modules' -Destination '.node_modules.bak' -Force
+        if ($scriptsMap.ContainsKey('lint:tailwind')) {
+            $failedStep = 'vpr lint:tailwind (lint)'
+            Invoke-Step -Message 'Verifying additional lint rules' -Exe 'vpr' -Arguments @('lint:tailwind')
         }
-        Remove-Item -LiteralPath 'package-lock.json' -Force -ErrorAction SilentlyContinue
 
-        $failedStep = 'vp install (lockfile update)'
-        Invoke-Step -Message 'Writing lockfile' -Exe 'vp' -Arguments @('install', '--lockfile-only', '--ignore-scripts')
-
-        $failedStep = 'vp install'
-        Invoke-Step -Message 'Syncing dependencies (vp install)' -Exe 'vp' -Arguments @('install', '--frozen-lockfile')
-        Remove-Item -LiteralPath '.node_modules.bak' -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    # Re-read package.json scripts after migration/update
-    $pkgJson = Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json -AsHashtable
-    $deps = $pkgJson['dependencies'] ?? @{}
-    $devDeps = $pkgJson['devDependencies'] ?? @{}
-    $scriptsMap = $pkgJson['scripts'] ?? @{}
-
-    $failedStep = 'vp fmt'
-    Invoke-Step -Message 'Formatting code & configs (vp fmt)' -Exe 'vp' -Arguments @('fmt')
-
-    $failedStep = 'vp check'
-    Invoke-Step -Message 'Checking quality & lint (vp check)' -Exe 'vp' -Arguments @('check', '--quiet', '--no-error-on-unmatched-pattern')
-
-    foreach ($s in @('lint:tailwind', 'agent:lint:ci')) {
-        if ($scriptsMap.ContainsKey($s)) {
-            $failedStep = "vpr $s (lint)"
-            Invoke-Step -Message 'Verifying additional lint rules' -Exe 'vpr' -Arguments @($s)
-            break
+        if (-not $hasCiUpdates) {
+            foreach ($s in @('agent:lint:ci', 'lint:ci')) {
+                if ($scriptsMap.ContainsKey($s)) {
+                    $failedStep = "vpr $s (lint)"
+                    Invoke-Step -Message 'Verifying CI workflow rules' -Exe 'vpr' -Arguments @($s)
+                    break
+                }
+            }
         }
-    }
 
-    $hasTypecheck = $false
-    foreach ($s in @('agent:typecheck', 'typecheck')) {
-        if ($scriptsMap.ContainsKey($s)) {
-            $hasTypecheck = $true
-            $failedStep = "vpr $s (typecheck)"
-            Invoke-Step -Message 'Verifying types' -Exe 'vpr' -Arguments @($s)
-            break
+        $hasTypecheck = $false
+        foreach ($s in @('agent:typecheck', 'typecheck')) {
+            if ($scriptsMap.ContainsKey($s)) {
+                $hasTypecheck = $true
+                $failedStep = "vpr $s (typecheck)"
+                Invoke-Step -Message 'Verifying types' -Exe 'vpr' -Arguments @($s)
+                break
+            }
         }
-    }
 
-    if (-not $hasTypecheck -and ($deps.ContainsKey('typescript') -or $devDeps.ContainsKey('typescript'))) {
-        $failedStep = 'vpx tsc --noEmit'
-        Invoke-Step -Message 'Verifying types' -Exe 'vpx' -Arguments @('tsc', '--noEmit')
-    }
-
-    foreach ($s in @('check:deadcode', 'knip')) {
-        if ($scriptsMap.ContainsKey($s)) {
-            $failedStep = "vpr $s (deadcode)"
-            Invoke-Step -Message 'Verifying dead code' -Exe 'vpr' -Arguments @($s)
-            break
+        if (-not $hasTypecheck -and ($deps.ContainsKey('typescript') -or $devDeps.ContainsKey('typescript'))) {
+            $failedStep = 'vpx tsc --noEmit'
+            Invoke-Step -Message 'Verifying types' -Exe 'vpx' -Arguments @('tsc', '--noEmit')
         }
-    }
 
-    foreach ($s in @('agent:verify:unit', 'agent:test:unit', 'test:unit')) {
-        if ($scriptsMap.ContainsKey($s)) {
-            $failedStep = "vpr $s (unit-test)"
-            Invoke-Step -Message 'Verifying unit tests' -Exe 'vpr' -Arguments @($s)
-            break
+        foreach ($s in @('check:deadcode', 'knip')) {
+            if ($scriptsMap.ContainsKey($s)) {
+                $failedStep = "vpr $s (deadcode)"
+                Invoke-Step -Message 'Verifying dead code' -Exe 'vpr' -Arguments @($s)
+                break
+            }
+        }
+
+        foreach ($s in @('agent:verify:unit', 'agent:test:unit', 'test:unit')) {
+            if ($scriptsMap.ContainsKey($s)) {
+                $failedStep = "vpr $s (unit-test)"
+                Invoke-Step -Message 'Verifying unit tests' -Exe 'vpr' -Arguments @($s)
+                break
+            }
+        }
+
+        $depPendingChanges = (& git status --porcelain 2>$null)
+        if ($depPendingChanges) {
+            $depCommitTitle = ($depCount -eq 1) ? "chore(deps): update dependency $singlePkgSummary" : "chore(deps): update dependencies ($depCount packages)"
+            $depCommitMsg = ($depCount -eq 1) ? $depCommitTitle : ($depCommitTitle + "`n`nUpgrade details:`n" + ($depCommitBodyLines -join "`n"))
+
+            $failedStep = 'git commit (deps)'
+            & git add -A
+            & git commit -q -m $depCommitMsg
+            if ($LASTEXITCODE -ne 0) {
+                throw 'git commit (deps) failed'
+            }
+            $createdCommits.Add($depCommitTitle)
         }
     }
 
-    $commitTitle = ($count -eq 1) ? "chore(deps): update dependency $singlePkgSummary" : "chore(deps): update dependencies ($count packages)"
-    $commitMsg = ($count -eq 1) ? $commitTitle : ($commitTitle + "`n`nUpgrade details:`n" + ($commitBodyLines -join "`n"))
+    if ($hasCiUpdates) {
+        $workflowFiles = @($ciFiles | Where-Object { $_ -imatch '^\.github/workflows/[^/]+\.ya?ml$' })
+        if (($workflowFiles.Count -gt 0) -and (-not (Get-Command 'actionlint' -ErrorAction SilentlyContinue))) {
+            $failedStep = 'actionlint pre-check'
+            throw 'actionlint is not installed'
+        }
 
-    $failedStep = 'git commit'
-    & git add -A
-    & git commit -q -m $commitMsg
-    if ($LASTEXITCODE -ne 0) {
-        throw 'git commit failed'
+        $failedStep = 'Update GitHub Actions major versions'
+        $freshCiRefs = @(Get-GitHubActionReference -FilePaths $ciFiles)
+        $updatesToApply = @(Get-GitHubActionUpdate -References $freshCiRefs -LatestMajorByRepo $latestMajorByRepo)
+
+        $changedCiFiles = @(Update-GitHubActionFile -Updates $updatesToApply)
+        if ($changedCiFiles.Count -gt 0) {
+            $failedStep = 'vp fmt (CI)'
+            $fmtArgs = @('fmt', '--no-error-on-unmatched-pattern') + $changedCiFiles
+            Invoke-Step -Message 'Formatting GitHub Actions files (vp fmt)' -Exe 'vp' -Arguments $fmtArgs
+        }
+
+        if ($workflowFiles.Count -gt 0) {
+            $failedStep = 'actionlint'
+            Invoke-Step -Message 'Verifying GitHub Actions workflows (actionlint)' -Exe 'actionlint'
+        }
+
+        $ciPendingChanges = (& git status --porcelain 2>$null)
+        if ($ciPendingChanges) {
+            $ciCommitTitle = ($ciCount -eq 1) ? "chore(ci): update action $singleCiSummary" : "chore(ci): update GitHub Actions ($ciCount actions)"
+            $ciCommitMsg = ($ciCount -eq 1) ? $ciCommitTitle : ($ciCommitTitle + "`n`nUpgrade details:`n" + ($ciCommitBodyLines -join "`n"))
+
+            $failedStep = 'git commit (ci)'
+            & git add -A
+            & git commit -q -m $ciCommitMsg
+            if ($LASTEXITCODE -ne 0) {
+                throw 'git commit (ci) failed'
+            }
+            $createdCommits.Add($ciCommitTitle)
+        }
     }
 }
 catch {
     $Host.UI.Write("`r`e[K")
     [Console]::Error.WriteLine("Error: Pre-checks failed at step '$failedStep'. Rolling back changes to 'main'...")
+    & git reset --hard -q 2>$null
     & git checkout -q main 2>$null
     & git branch -D $tempBranch >$null 2>&1
     if (Test-Path -LiteralPath '.node_modules.bak' -PathType Container) {
         Remove-Item -LiteralPath 'node_modules' -Recurse -Force -ErrorAction SilentlyContinue
         Move-Item -LiteralPath '.node_modules.bak' -Destination 'node_modules' -Force
     }
-    else {
+    elseif ($hasDepUpdates) {
         $env:VP_LOG = 'error'
         & vp install --frozen-lockfile --silent 2>$null
     }
@@ -355,12 +689,18 @@ catch {
 & git merge --ff-only -q $tempBranch
 & git branch -D -q $tempBranch
 
-& git rev-parse --abbrev-ref '@{u}' >$null 2>&1
-if ($LASTEXITCODE -eq 0) {
-    $failedStep = 'git push'
-    Invoke-Step -Message 'Pushing to remote' -Exe 'git' -Arguments @('push', '-q', 'origin', 'main')
-    Write-Output "Pushed: $commitTitle"
-}
-else {
-    Write-Output "Committed and merged: $commitTitle"
+if ($createdCommits.Count -gt 0) {
+    & git rev-parse --abbrev-ref '@{u}' >$null 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $failedStep = 'git push'
+        Invoke-Step -Message 'Pushing to remote' -Exe 'git' -Arguments @('push', '-q', 'origin', 'main')
+        foreach ($title in $createdCommits) {
+            Write-Output "Pushed: $title"
+        }
+    }
+    else {
+        foreach ($title in $createdCommits) {
+            Write-Output "Committed and merged: $title"
+        }
+    }
 }
