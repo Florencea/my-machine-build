@@ -86,6 +86,10 @@ Always prefer high-performance single-purpose CLI binaries for instant execution
 - **Project Script Execution**:
   - Run `vpr <script>` or `vp run <script>`.
   - STRICTLY FORBIDDEN to invoke `npx`, `pnpm dlx`, `bunx`, or `npm run`.
+- **Web Standards & Guidance (Google Chrome SSOT)**:
+  - Search best practices on-demand: `vpx modern-web-guidance search "<query>"`.
+  - Retrieve authoritative specification: `vpx modern-web-guidance retrieve "<id>"`.
+  - Legacy pattern codebase scan: `vpx modern-web-guidance legacy-scan [path] --json`.
 
 ### Tier 4: Heavy Compute & Domain Libraries (Python)
 

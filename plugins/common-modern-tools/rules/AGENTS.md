@@ -15,6 +15,7 @@
     - HTTP API probing: `xh --headers GET <url>` / `xh POST <url> key=val`
     - Diagnostics & utilities: `dust -d 2 -p`, `pdftotext`, `shfmt`, `actionlint`, `hyperfine`
     - Node.js & frontend toolchain: `vp`, `vpx <tool>`, `vpr <script>`
+    - Web standards & guidance SSOT: `vpx modern-web-guidance search "<query>"` / `retrieve "<id>"` / `legacy-scan [path]`
   - Refer to the **`common-toolchain`** skill for detailed tool options, multi-tier selection trees, and recipes.
 - **Zero Throwaway Script Mandate**:
   - NEVER generate ephemeral script files (`temp.py`, `scratch.js`, `test.ps1`, `query.sh`) on disk for ad-hoc queries, transformations, or glue logic.

@@ -13,6 +13,7 @@ Before authoring components or styles, verify API signatures via live documentat
 - **React 19 Reference**: `webread https://react.dev/reference/react`
 - **Official "You Might Not Need an Effect"**: `webread https://react.dev/learn/you-might-not-need-an-effect`
 - **Tailwind CSS v4 Documentation**: `webread https://tailwindcss.com/docs`
+- **Web Platform Standards & Modern Web Guidance (External SSOT)**: Query native HTML/CSS/DOM primitives (`<dialog>`, `[popover]`, `anchor()`, View Transitions, Container Queries, `:user-invalid`, ARIA) via `vpx modern-web-guidance search "<query>"` / `retrieve "<id>"`. This skill defines React 19 and Tailwind architecture only; all underlying web platform capabilities are strictly delegated to external MWG queries.
 
 ---
 

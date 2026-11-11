@@ -27,7 +27,7 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
 - **`plugins/modern-web-stack/`** (Shared across macOS & Windows 11):
   - `plugin.json`: Manifest for cross-platform web development stack.
   - `rules/AGENTS.md`: Consolidated always-on rules for Node.js, TypeScript 5+, React 19, Tailwind CSS v4, Vitest Browser testing, and GitHub Actions CI (`actionlint`).
-  - `skills/<skill-name>/SKILL.md`: `modern-nodejs`, `modern-typescript`, `modern-react-tailwind`, `node-project-architecture`, `tanstack-router`.
+  - `skills/<skill-name>/SKILL.md`: `modern-nodejs`, `modern-typescript`, `modern-react-tailwind`, `modern-hono-drizzle`, `node-project-architecture`, `tanstack-router`, `modern-web-guidance`.
 
 ---
 
