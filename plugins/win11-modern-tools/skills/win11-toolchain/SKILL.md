@@ -7,347 +7,89 @@ compatibility: Windows 11, PowerShell 7+, Vite+
 # Windows 11 Platform Toolchain & Execution Guidelines
 
 > [!NOTE]
-> For universal high-performance CLI tools (`rg`, `fd`, `bat`, `sd`, `jq`, `yq`, `duckdb`, `sqlite3`, `xsv`, `xh`, `dust`, `pdftotext`, `shfmt`, `actionlint`, `hyperfine`, Vite+), refer to the **`common-toolchain`** skill.
+> For universal CLI binaries (`rg`, `fd`, `bat`, `sd`, `jq`, `yq`, `duckdb`, `xsv`, `xh`, Vite+), refer to the **`common-toolchain`** skill.
+> For PowerShell authoring, AST verification, and `PSScriptAnalyzerSettings.psd1` rules, refer to the **`modern-powershell`** skill.
 
-## 1. Subshell Stdin Defense & Automation Patterns
+---
 
-### 1.1 Background Subshell Stdin Pitfall
+## 1. Double-Shell Invocation & Quote-Stripping Defense
 
-Background subshells pipe standard input. Commands like `rg`, `jq`, `sd`, `xsv`, or `tokei` will hang indefinitely waiting for an EOF stream if executed without explicit target paths:
+In Antigravity's Windows execution environment, the host shell is **Windows PowerShell 5.1** (`powershell.exe`). When launching `pwsh.exe -NoLogo -NoProfile -Command '...'`, Windows PowerShell 5.1 strips internal double quotes from the command string.
+
+### Safe Invocation Patterns
+
+- **Single-Quote Literals**:
+  Use single quotes for inner string literals:
+  ```powershell
+  pwsh -NoLogo -NoProfile -Command '$src = ''C:\path\to\dir''; Get-ChildItem -LiteralPath $src'
+  ```
+- **Base64 `-EncodedCommand` (Recommended for Multi-Line Scripts)**:
+  Bypass outer shell quote-stripping by encoding UTF-16LE bytes to Base64:
+  ```powershell
+  $script = @'
+  $ErrorActionPreference = 'Stop'; Set-StrictMode -Version Latest
+  $src = 'C:\path\to\dir'
+  $dest = 'C:\path\to\target'
+  if (-not (Test-Path -LiteralPath $src)) { throw "Source missing: $src" }
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  Copy-Item -LiteralPath $src -Destination $dest -Recurse -Force
+  '@
+  $bytes = [System.Text.Encoding]::Unicode.GetBytes($script)
+  $b64 = [Convert]::ToBase64String($bytes)
+  pwsh -NoLogo -NoProfile -EncodedCommand $b64
+  ```
+
+---
+
+## 2. Dev Drive (ReFS) & Windows 10 IoT LTSC Capability Matrix
+
+- **Dev Drive (ReFS)**:
+  - Supported exclusively on Windows 11 Build 22621+. Uses ReFS Copy-on-Write (Block Cloning) and asynchronous Defender inspection.
+  - Prioritize placing workspace repositories and package caches on Dev Drive (`E:\_Workspace`, `VP_HOME = E:\vite-plus`).
+- **Windows 10 IoT LTSC Fallback**:
+  - Dev Drive (`fsutil devdrv`) is strictly unavailable. Use standard NTFS storage (`$HOME\_Workspace`, `VP_HOME = $HOME\.vite-plus`) without querying `fsutil devdrv`.
+  - AppX module: On Windows 10, run AppX package queries via Windows PowerShell 5.1 (`powershell.exe`) due to .NET Core `PlatformNotSupportedException` in PS 7.
+
+---
+
+## 3. Windows Defender Developer Exclusions
+
+In local development environments, verify that modern toolchain executables and build directories are excluded from real-time monitoring to prevent file-locking hangs and I/O bottlenecks:
+
+- Excluded processes: `pwsh.exe`, `vp.exe`, `node.exe`, `git.exe`
+- Excluded directories: `dist/`, `build/`, `node_modules/`
+
+---
+
+## 4. Array Unrolling & String Indexing Guard
+
+PowerShell pipelines unroll single-item outputs into scalar objects. Indexing `[0]` on a scalar `System.String` returns a single `[char]`. Always wrap pipeline or filtering expressions in `@(...)`:
 
 ```powershell
-# BAD: Subshell hangs indefinitely
-rg "pattern"
-tokei
-
-# GOOD: Explicit paths or input sources
-rg -n -M 200 "pattern" .
-tokei .
-```
-
-### 1.2 Pipeline Array Unrolling & String Indexing Guard
-
-In PowerShell, filtering operations (like `Where-Object` or regex splits) that return a single result unroll into a scalar `System.String`. Indexing `[0]` on a scalar string extracts the first character (`[char]`):
-
-```powershell
-# BAD: If only one line matches, $lines[0] returns [char]'h' instead of the line!
-$lines = $output | Where-Object { $_ -match "https" }
-$firstUrl = $lines[0]
-
-# GOOD: Wrap in @(...) array subexpression
 $lines = @($output | Where-Object { $_ -match "https" })
-$firstUrl = $lines[0]
+if ($lines.Count -gt 0) {
+    $firstUrl = $lines[0]
+}
 ```
 
 ---
 
-## 2. PowerShell 5.1 vs PowerShell 7+ Compatibility
+## 5. Defensive Path Assertions & Fail-Fast Header
 
-### 2.1 Bootstrap Scripts vs Advanced Automation
-
-- **Bootstrap Scripts (`scripts/install.ps1`, `#Requires -Version 5.1`)**:
-  - Must run cleanly on out-of-the-box Windows 10/11 with default Windows PowerShell 5.1 (`powershell.exe`) as well as PowerShell 7+ (`pwsh.exe`).
-  - Prohibited in bootstrap scripts (enforced via `PSUseCompatibleSyntax` with `TargetVersions = @('5.1', '7.4')`):
-    - Ternary operators: `$cond ? $a : $b`
-    - Null-coalescing operators: `$a ?? $b`, `$a ??= $b`
-    - Safe navigation: `$a?.b`
-    - Pipeline chain operators: `&&`, `||`
-    - Parallel loop: `ForEach-Object -Parallel`
-    - Hashtable conversion: `ConvertFrom-Json -AsHashtable`
-    - Unprotected `$IsWindows` / `$IsMacOS` / `$IsLinux` reads (undefined in PS 5.1; throws `VariableIsUndefined` under `Set-StrictMode -Version Latest`; guard with `($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows`).
-    - Multi-character string `.Split('ab')` calls (use `-split` or `.Split([char[]]'ab')`).
-- **Modern Automation & CLI Scripts (`cli/*.ps1`)**:
-  - Always run under PowerShell 7 (`pwsh.exe`) and leverage modern syntax freely. Refer to the **`modern-powershell`** skill for complete cross-platform and cross-version rules.
-
-### 2.2 UTF-8 Pipeline Encoding
-
-Ensure UTF-8 without BOM stream encoding for all console outputs:
-
-```powershell
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-```
-
----
-
-## 3. Dev Drive (`E:\`) & ReFS Performance Optimization
-
-- Dev Drive utilizes the ReFS filesystem with asynchronous Microsoft Defender filter inspection on Windows 11 Build 22621+.
-- When creating workspace directories or caches on Windows 11, place them under `E:\_Workspace` or `VP_HOME = E:\vite-plus` to maximize build and disk throughput.
-- **Windows 10 IoT LTSC Fallback Invariant**:
-  - Dev Drive (`fsutil devdrv`) is strictly unsupported on Windows 10 (Build 19044/19045). Never invoke `fsutil devdrv` on Windows 10.
-  - On Windows 10 IoT LTSC, use standard NTFS paths: `$HOME\_Workspace` and `VP_HOME = $HOME\.vite-plus`.
-
----
-
-## 4. YouTube Protected Streaming Workaround
-
-Modern YouTube media stream URLs (`googlevideo.com`) use Sabr/TVHTML5 token binding. Direct playback via `ffmpeg -i <url>` fails with HTTP `403 Forbidden`. Always download snippets via `yt-dlp` first:
-
-```powershell
-yt-dlp --download-sections "*00:01:00-00:01:30" --cookies-from-browser edge -o "clip.mp4" "<url>"
-```
-
----
-
-## 5. Safe Multi-Statement Execution & Defensive Path Assertions
-
-### 5.1 Fail-Fast Header Invariant
-
-Every multi-command block executed via `pwsh -Command` or `pwsh -EncodedCommand` MUST begin with strict error stopping:
+Every script block executed via `pwsh -Command` or `-EncodedCommand` must begin with strict error stopping:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 ```
 
-If any command, variable assignment, or path evaluation fails, the script aborts immediately rather than continuing into downstream destructive operations with uninitialized (`$null`) variables.
-
-### 5.2 Defensive Path Assertion Recipe
-
-Never execute recursive copy, move, or delete without validating that both source and destination are non-null and valid:
+Before executing destructive recursive operations (`Copy-Item -Recurse`, `Remove-Item -Recurse`), defensively assert that paths are non-null and exist:
 
 ```powershell
-# BANNED: Dangerous unchecked copy
-Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
-
-# REQUIRED: Defensive assertion pattern
-$src = 'C:\path\to\source'
-$dest = 'relative\path\to\target'
-
 if ([string]::IsNullOrWhiteSpace($src) -or -not (Test-Path -LiteralPath $src)) {
     throw "Source path is null, whitespace, or non-existent: '$src'"
 }
 if ([string]::IsNullOrWhiteSpace($dest)) {
     throw "Destination path cannot be null or whitespace"
-}
-
-# Ensure destination exists before copying
-if (-not (Test-Path -LiteralPath $dest)) {
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-}
-
-Copy-Item -LiteralPath $src -Destination $dest -Recurse -Force
-```
-
----
-
-## 6. Windows Double-Shell Quoting Pitfalls & Solutions
-
-### 6.1 The Quote-Stripping Mechanism
-
-In Antigravity on Windows, commands run inside an outer **Windows PowerShell 5.1** (`powershell.exe`) host session. When calling `pwsh.exe -NoLogo -NoProfile -Command '...'`, Windows PowerShell 5.1 strips internal double quotes before launching `pwsh.exe`:
-
-```powershell
-# BAD: Windows PowerShell 5.1 strips "..." before passing to pwsh.exe!
-pwsh -NoLogo -NoProfile -Command '
-$src = "C:\Users\name\folder"
-# pwsh actually receives: $src = C:\Users\name\folder
-# Throws: "Cannot find cmdlet C:\Users\name\folder" and leaves $src as $null!
-'
-```
-
-### 6.2 Solutions
-
-#### Solution A: Single-Quote Literals
-
-Use single quotes for inner string literals, or escape properly:
-
-```powershell
-pwsh -NoLogo -NoProfile -Command '$src = ''C:\Users\name\folder''; ...'
-```
-
-#### Solution B: Base64 `-EncodedCommand` (Recommended for Complex Scripts)
-
-For multi-line scripts or commands containing multiple quote styles, encode the script as a UTF-16LE Base64 string. This guarantees zero quote stripping or parameter mangling by the outer shell:
-
-```powershell
-$script = @'
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
-$src = 'C:\Users\name\folder'
-$dest = 'target\folder'
-if (-not (Test-Path -LiteralPath $src)) { throw "Source missing" }
-New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item -LiteralPath $src -Destination $dest -Recurse -Force
-'@
-
-$bytes = [System.Text.Encoding]::Unicode.GetBytes($script)
-$b64 = [Convert]::ToBase64String($bytes)
-pwsh -NoLogo -NoProfile -EncodedCommand $b64
-```
-
----
-
-## 7. Safe Binary & Large File Inspection Protocol
-
-### 7.1 The CPU / Memory Deadlock Anti-Pattern
-
-Attempting to read large binaries or files (>1MB) into PowerShell memory to run regex patterns is strictly prohibited:
-
-```powershell
-# BANNED ANTI-PATTERN: Consumes 600MB+ RAM and pegs CPU at 100%
-$bytes = [System.IO.File]::ReadAllBytes("path\to\huge.exe")
-$text = [System.Text.Encoding]::ASCII.GetString($bytes)
-[regex]::Matches($text, "pattern")
-```
-
-### 7.2 Native Streaming Tool SSOT (`rg -a`)
-
-Always inspect binary files, DLLs, and executables using native, streaming Rust CLI tools:
-
-```bash
-# REQUIRED: Near-zero memory, streaming, completes in milliseconds
-rg -a -M 200 "pattern" path\to\huge.exe
-```
-
-### 7.3 In-Memory Read File-Size Gate
-
-If PowerShell code must read file contents into memory, enforce an explicit 1MB safety threshold:
-
-```powershell
-$fileInfo = Get-Item -LiteralPath $targetFile
-if ($fileInfo.Length -gt 1MB) {
-    throw "File '$targetFile' ($([math]::Round($fileInfo.Length / 1MB, 2)) MB) exceeds 1MB in-memory threshold. Use native CLI tools instead."
-}
-$content = Get-Content -LiteralPath $targetFile -Raw
-```
-
----
-
-## 8. Git-First Incident Recovery & MAX_PATH Defense
-
-### 8.1 Why Filesystem Recursion Fails on Windows
-
-When an erroneous recursive copy or directory creation occurs inside a repository:
-
-1. Deeply nested paths (such as `.pnpm` packages or `node_modules`) easily exceed the default 260-character Windows `MAX_PATH` limit.
-2. Background indexers, language servers, or anti-virus filters often hold file handles, causing `Remove-Item -Recurse`, `rd /s /q`, or `robocopy /purge` to fail with "Access Denied" or "Directory not empty", hanging the terminal session.
-
-### 8.2 Git-First Recovery Pattern
-
-Git has native long-path support. Instead of manual deletion, always recover the clean repository state via Git:
-
-```bash
-# 1. Immediately halt all filesystem mutations
-# 2. Clean all untracked files and directories with long-path bypass:
-git -c core.longpaths=true clean -ffdx
-
-# 3. Discard all unstaged tracked file modifications:
-git checkout -- .
-
-# 4. Verify clean working tree:
-git status
-```
-
----
-
-## 9. PowerShell Script Quality Assurance & VS Code Parity
-
-### 9.1 The Problem with Abandoned Script Warnings
-
-When writing PowerShell scripts, subtle warnings often escape detection (such as Cmdlet aliases, empty catch blocks, unapproved verbs, or missing scope modifiers). In particular, when executing parallel loops (`ForEach-Object -Parallel`), omitting `$using:` on caller-scoped variables causes silent parameter assignment bugs or runtime failures:
-
-```powershell
-# BAD: Omitting $using: causes $cmdExe to be $null inside the parallel runspace
-$items | ForEach-Object -Parallel {
-    & $cmdExe $_
-}
-
-# GOOD: Explicit $using: modifier binds the caller variable
-$items | ForEach-Object -Parallel {
-    & $using:cmdExe $_
-}
-```
-
-### 9.2 VS Code Formatting Parity Settings
-
-The workspace enforces exact alignment with the user's VS Code PowerShell formatting configuration (`Stroustrup` style, 4-space indentation, no trailing semicolons, aligned hashtables, and constant single quotes).
-
-The single source of truth configuration is maintained in `PSScriptAnalyzerSettings.psd1`:
-
-```powershell
-@{
-    Severity            = @('ParseError', 'Error', 'Warning', 'Information')
-    IncludeDefaultRules = $true
-    ExcludeRules        = @(
-        'PSUseBOMForUnicodeEncodedFile',
-        'PSAvoidUsingPositionalParameters',
-        'PSProvideCommentHelp',
-        'PSUseConsistentIndentation'
-    )
-
-    Rules               = @{
-        PSPlaceOpenBrace                             = @{
-            Enable             = $true
-            OnSameLine         = $true
-            NewLineAfter       = $true
-            IgnoreOneLineBlock = $false
-        }
-        PSPlaceCloseBrace                            = @{
-            Enable             = $true
-            NewLineAfter       = $true
-            IgnoreOneLineBlock = $false
-        }
-        PSUseConsistentWhitespace                    = @{
-            Enable                                  = $true
-            CheckOpenBrace                          = $true
-            CheckOpenParen                          = $true
-            CheckOperator                           = $true
-            CheckSeparator                          = $true
-            CheckInnerBrace                         = $true
-            CheckParameter                          = $true
-            CheckPipe                               = $true
-            CheckPipeForRedundantWhitespace         = $true
-            IgnoreAssignmentOperatorInsideHashTable = $true
-        }
-        PSAlignAssignmentStatement                   = @{
-            Enable         = $true
-            CheckHashtable = $true
-        }
-        PSAvoidUsingDoubleQuotesForConstantString    = @{
-            Enable = $true
-        }
-        PSAvoidSemicolonsAsLineTerminators           = @{
-            Enable = $true
-        }
-        PSUseCorrectCasing                           = @{
-            Enable = $true
-        }
-        PSAvoidTrailingWhitespace                    = @{
-            Enable = $true
-        }
-        PSPossibleIncorrectUsageOfAssignmentOperator = @{
-            Enable = $true
-        }
-    }
-}
-```
-
-### 9.3 Three-Stage Formatting, AST & Non-Bypassable Static Analysis Workflow
-
-Never add `SuppressMessageAttribute` or pass `-ExcludeRule`. After editing any `.ps1`, `.psm1`, or `.psd1` file, run all three verification stages:
-
-```powershell
-# 1. Format script (with CRLF -> LF normalization and UTF-8 without BOM)
-$file = 'cli/command.ps1'
-$absPath = (Resolve-Path -LiteralPath $file).Path
-$raw = [System.IO.File]::ReadAllText($absPath)
-$formatted = Invoke-Formatter -ScriptDefinition $raw -Settings ./PSScriptAnalyzerSettings.psd1
-$normalized = ($formatted -replace "`r`n", "`n").TrimEnd() + "`n"
-[System.IO.File]::WriteAllText($absPath, $normalized, [System.Text.UTF8Encoding]::new($false))
-
-# 2. Verify AST grammar (zero parse errors)
-$parseErrors = $null
-[void][System.Management.Automation.Language.Parser]::ParseFile($absPath, [ref]$null, [ref]$parseErrors)
-if ($parseErrors) {
-    throw "AST syntax errors in ${file}: $parseErrors"
-}
-
-# 3. Verify static analysis with -IncludeSuppressed (must pass with 0 violations)
-$violations = @(Invoke-ScriptAnalyzer -Path $absPath -Settings ./PSScriptAnalyzerSettings.psd1 -IncludeSuppressed)
-if ($violations.Count -gt 0) {
-    $violations | Format-Table -AutoSize
-    throw "PSScriptAnalyzer failed on $file"
 }
 ```

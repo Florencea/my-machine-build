@@ -6,153 +6,52 @@ compatibility: TypeScript 5+, Oxlint, Oxfmt, Vite+, Zod
 
 # Strict TypeScript Guidelines
 
-**CRITICAL:** This project strictly enforces zero-warning `oxlint` linting, automated `oxfmt` formatting, and strict compiler checks (`tsc --noEmit`). Write clean, structurally safe TypeScript code that compiles on the first attempt without regressions.
+## 1. Authoritative External Endpoints & Verification Gate
+
+Inspect official references and query local type declarations before modifying code or configurations:
+
+- **TypeScript Reference**: `webread https://www.typescriptlang.org/docs/`
+- **Oxc Reference**: `webread --llms https://oxc.rs` (or `https://oxc.rs/llms.txt`)
+- **CLI Verification**: Run `vpx oxlint --help` (or `vp lint --help`) and `tsc -b --pretty false`.
 
 ---
 
-## 1. Pre-Execution Verification & Live Query Mandate
+## 2. Zero Suppression & Non-Negotiable Type Invariants
 
-Before troubleshooting unfamiliar type errors or adjusting compiler/linter settings, query live flags:
-
-- Run `vpx oxlint --help` (or `vp lint --help`) or `tsc --help` to confirm valid options.
-- Inspect official LLM references: `webread --llms https://oxc.rs` (or `https://oxc.rs/llms.txt`).
-- NEVER guess tsconfig compiler options or linter rule names.
-
----
-
-## 2. Type Safety & Linting Decision Tree
-
-Before writing or refactoring TypeScript code, apply this decision tree to prevent defects:
-
-- **Handling Boundary / Untrusted Data (API, JSON, Env, Files)**:
-  - ❌ NEVER cast with `as unknown as Type` or raw `as Type`.
-  - ✅ Define a Zod schema and run `schema.safeParse(data)`. Infer static types via `z.infer<typeof schema>`.
-- **Handling Diagnostics & Lint Errors**:
-  - ❌ NEVER suppress with `// @ts-ignore`, `// @ts-expect-error`, or `/* oxlint-disable */`.
-  - ❌ NEVER downgrade rules or add global ignores in configuration files.
-  - ✅ Narrow types with control flow (`typeof`, `instanceof`, `in`), use discriminated unions, or adjust type declarations.
-- **Conditionals & Truthiness**:
-  - Always evaluate explicit boolean values (`strict-boolean-expressions`).
-  - ❌ `if (str)` / `if (arr.length)` / `if (obj)`
-  - ✅ `if (str !== '')` / `if (arr.length > 0)` / `if (obj !== null)`
-- **Map Lookups**:
-  - Perform a single `.get()` and check against `undefined`. NEVER use `Map.has()` followed by `Map.get()`.
-  - ❌ `if (map.has(key)) { const v = map.get(key); }`
-  - ✅ `const v = map.get(key); if (v !== undefined) { ... }`
-- **Type Modeling (Static vs Dynamic)**:
-  - Static configs, mock data, known keys $\rightarrow$ `satisfies Type` (validates shape while preserving narrow literal inference).
-  - Dynamic maps, API dictionaries $\rightarrow$ `: Record<K, V>` or `Map<K, V>` (widens type so defensive `undefined` checks are required).
+- **Strict Ban on Suppression Directives**:
+  - STRICTLY PROHIBITED: `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, `/* oxlint-disable */`, `// biome-ignore`.
+  - Never downgrade rules in `tsconfig.json` or `.oxlintrc.json`. Resolve all type errors structurally.
+- **Ban on Unsafe Casts & Assertions**:
+  - Never use double assertions (`as unknown as TargetType`) or raw casts without runtime proof. Narrow types via control flow (`typeof`, `instanceof`, `in`), discriminated unions, or Zod schemas.
+- **Strict Boolean Expressions**:
+  - Always evaluate explicit booleans (`if (str !== "")`, `if (arr.length > 0)`, `if (obj !== null)`).
+- **Single Map Lookups**:
+  - Perform a single `.get()` and check against `undefined`. Never invoke `map.has(key)` followed by `map.get(key)`.
+- **Type Modeling (`satisfies` vs `Record`)**:
+  - Static configurations & known objects $\rightarrow$ use `satisfies Type` to validate shape while preserving literal types.
+  - Dynamic dictionaries $\rightarrow$ use `: Record<K, V>` or `Map<K, V>` requiring explicit `undefined` checks.
 - **Template Literals**:
-  - ❌ NEVER interpolate objects or unknown types (`${obj}`).
-  - ✅ Convert explicitly: `${String(val)}` or `${JSON.stringify(val)}`.
+  - Only interpolate primitives (`string`, `number`, `boolean`). Explicitly convert complex objects: `${String(val)}` or `${JSON.stringify(val)}`.
 
 ---
 
-## 3. Zod-First Runtime Validation Patterns
+## 3. Zod-First Runtime Boundary Validation
 
-Use Zod as the authoritative boundary guard for external data:
+Validate all external data (API responses, `JSON.parse`, configuration files, `process.env`) using Zod schemas:
 
 ```ts
 import { z } from "zod";
 
-export const UserProfileSchema = z.object({
+export const UserSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  email: z.string().email(),
   role: z.enum(["admin", "user"]).default("user"),
-  metadata: z.record(z.unknown()).optional(),
 });
 
-export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type User = z.infer<typeof UserSchema>;
 
-export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
-  const res = await fetch(`/api/users/${userId}`);
-  if (!res.ok) return null;
-
-  const rawJson = (await res.json()) as unknown;
-  const parsed = UserProfileSchema.safeParse(rawJson);
-  if (!parsed.success) {
-    console.error("Invalid user profile received:", parsed.error.flatten());
-    return null;
-  }
-  return parsed.data; // Fully typed, 100% runtime-verified
+export function parseUserData(raw: unknown): User | null {
+  const result = UserSchema.safeParse(raw);
+  return result.success ? result.data : null;
 }
 ```
-
----
-
-## 4. All-in-One `vite.config.ts` Consolidation
-
-In modern Vite+ applications, configure Oxlint and Oxfmt rules directly within `vite.config.ts`:
-
-```ts
-import { defineConfig } from "vite-plus";
-
-export default defineConfig({
-  lint: {
-    options: {
-      typeAware: true,
-      typeCheck: true,
-    },
-    rules: {
-      "typescript/no-explicit-any": "error",
-      "typescript/no-floating-promises": "error",
-      "typescript/strict-boolean-expressions": "error",
-    },
-  },
-  fmt: {
-    printWidth: 100,
-    tabWidth: 2,
-    singleQuote: false,
-    trailingComma: "all",
-  },
-});
-```
-
----
-
-## 5. Type-Safe Localization SSOT Pattern (i18n)
-
-Maintain complete parity across locale translations without manual key verification:
-
-### 5.1 Schema SSOT (`src/locales/schema.ts`)
-
-```ts
-import { z } from "zod";
-
-export const TranslationSchema = z.object({
-  common: z.object({
-    confirm: z.string(),
-    cancel: z.string(),
-    loading: z.string(),
-  }),
-  auth: z.object({
-    signIn: z.string(),
-    signOut: z.string(),
-    welcomeUser: z.string(), // "Welcome, {name}!"
-  }),
-});
-
-export type Translations = z.infer<typeof TranslationSchema>;
-```
-
-### 5.2 Strict Parity Implementation (`src/locales/en-US.ts` & `src/locales/zh-TW.ts`)
-
-```ts
-import type { Translations } from "./schema.ts";
-
-export const enUS: Translations = {
-  common: {
-    confirm: "Confirm",
-    cancel: "Cancel",
-    loading: "Loading...",
-  },
-  auth: {
-    signIn: "Sign In",
-    signOut: "Sign Out",
-    welcomeUser: "Welcome, {name}!",
-  },
-};
-```
-
-Any missing key or typo in `zh-TW.ts` or `en-US.ts` is caught immediately by the TypeScript compiler (`tsc --noEmit`).

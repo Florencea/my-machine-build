@@ -6,159 +6,52 @@ compatibility: Node.js (Active LTS), Vite+, Zod
 
 # Modern Node.js Guidelines
 
-## 1. Native API Selection Decision Tree
+## 1. Authoritative External Endpoints
 
-When building Node.js CLI tools and scripts, prioritize zero-dependency native built-ins over third-party packages:
+Query official documentation before authoring Node.js scripts or configurations:
 
-- **CLI Argument Parsing**:
-  - Always use `node:util` `parseArgs({ options, allowPositionals })`.
-  - Avoid `commander`, `yargs`, or `minimist`.
-- **Terminal Styling & Colors**:
-  - Always use `node:util` `styleText('color', text)`.
-  - Avoid `chalk`, `picocolors`, or `colorette`.
-- **File System Globbing**:
-  - Always use `node:fs/promises` `glob(pattern)`.
-  - Avoid `fast-glob` or `glob`.
-- **Embedded Database**:
-  - Always use native `node:sqlite` (`DatabaseSync`) for local persistence.
-  - Avoid external native C-binding SQLite packages (`better-sqlite3`, `sqlite3`).
-- **Standard Web Utilities**:
-  - Always use native globals: `fetch`, `FormData`, `Request`, `Response`, `crypto.randomUUID()`, `structuredClone()`, `URL`, `AbortController`.
-  - Avoid `axios`, `node-fetch`, `uuid`, `lodash`.
-- **Unit Testing & Assertions**:
-  - Always use native `node:test` and `node:assert/strict`.
+- **Node.js Official API Reference**: `webread https://nodejs.org/api/`
+- **Vite+ Documentation**: `webread --llms https://viteplus.dev` (or `https://viteplus.dev/llms-full.txt`)
+- **Runtime Toolchain Inspection**: `vp toolchain` to inspect runtime version and active tools dynamically.
 
 ---
 
-## 2. Pre-Execution Config Verification & Native Manifest Operations
+## 2. Zero-Dependency Native Selection Tree
 
-- **Pre-Verification Mandate**: Before authoring or updating configuration files (`package.json`, `pnpm-workspace.yaml`, toolchain settings), query authoritative endpoints:
-  - Toolchain Status: Run `vp toolchain` to inspect runtime version and active tools dynamically.
-  - Live Documentation: Run `webread --llms https://viteplus.dev` (or query `https://viteplus.dev/llms-full.txt`).
-  - NEVER guess syntax, package fields, or flags from outdated memory.
-- **Unified Vite+ Toolchain Mandate**:
-  - Always use `vp`, `vpx`, and `vpr` across all Node.js projects.
-  - STRICTLY PROHIBITED to invoke package-manager specific runners (`npx`, `pnpm dlx`, `bunx`, `npm run`).
-  - One-off tool execution: `vpx <tool>` (e.g. `vpx oxlint`, `vpx oxfmt`).
-  - Script execution: `vpr <script>` (or `vp run <script>`).
-  - Dependency management: `vp install`, `vp update`, `vp add`, `vp remove`.
-- **Native Manifest Operations (`vp pm pkg`)**:
-  - Querying fields: `vp pm pkg get <key>` (or `vp -C <dir> pm pkg get <key>`)
-  - Mutating fields: `vp pm pkg set <key>=<value>` (use `--json` for objects/booleans/arrays)
-  - Removing fields: `vp pm pkg delete <key>`
-  - Standardizing & fixing: `vp pm pkg fix`
-  - STRICTLY FORBIDDEN to use raw regex replacements or `jq` intermediate file swapping (`package.json.tmp && mv`).
+Prioritize Node.js built-ins over third-party dependencies:
+
+- **CLI Argument Parsing**: Always use `node:util` `parseArgs({ options, allowPositionals })`.
+- **Terminal Styling**: Always use `node:util` `styleText('color', text)`.
+- **File System Globbing**: Always use `node:fs/promises` `glob(pattern)`.
+- **Embedded Database**: Always use native `node:sqlite` (`DatabaseSync`).
+- **Standard Web Globals**: Always use native `fetch`, `FormData`, `Request`, `Response`, `crypto.randomUUID()`, `structuredClone()`, `URL`.
+- **Unit Testing**: Always use native `node:test` and `node:assert/strict`.
+- **Environment Loading**: Always use native `process.loadEnvFile()`.
 
 ---
 
-## 3. Zod-First Boundary Validation Pattern
+## 3. Native Manifest Operations (`vp pm pkg`)
 
-Validate environment variables and untrusted runtime inputs with Zod schemas:
+Always manage `package.json` fields via native Vite+ manifest commands:
 
-```ts
-import { z } from "zod";
+- Inspect: `vp pm pkg get <key>`
+- Mutate: `vp pm pkg set <key>=<value>` (pass `--json` for arrays/objects/booleans)
+- Remove: `vp pm pkg delete <key>`
+- Standardize & Normalize: `vp pm pkg fix`
 
-const ConfigSchema = z.object({
-  PORT: z.coerce.number().default(3000),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  DATABASE_URL: z.string().url(),
-});
-
-const parsed = ConfigSchema.safeParse(process.env);
-if (!parsed.success) {
-  console.error("Configuration error:", parsed.error.flatten());
-  process.exitCode = 1;
-  throw new Error("Invalid environment configuration");
-}
-export const config = parsed.data;
-```
+STRICTLY FORBIDDEN to use raw regex replacement or `jq` file swapping (`package.json.tmp && mv`).
 
 ---
 
-## 4. Native Built-In Usage Examples
+## 4. Cross-Platform Portability & Process Safety
 
-### Native CLI Argument Parsing (`node:util`):
-
-```ts
-import { parseArgs } from "node:util";
-
-const { values, positionals } = parseArgs({
-  options: {
-    verbose: { type: "boolean", short: "v", default: false },
-    output: { type: "string", short: "o" },
-  },
-  allowPositionals: true,
-});
-```
-
-### Native Terminal Colors (`node:util`):
-
-```ts
-import { styleText } from "node:util";
-
-console.log(styleText("green", "✔ Operation completed successfully"));
-console.log(styleText(["bold", "red"], "✖ Fatal error encountered"));
-```
-
-### Native SQLite Persistence (`node:sqlite`):
-
-```ts
-import { DatabaseSync } from "node:sqlite";
-
-const db = new DatabaseSync("app.db");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS metrics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    value REAL NOT NULL
-  )
-`);
-const insert = db.prepare("INSERT INTO metrics (name, value) VALUES (?, ?)");
-insert.run("cpu_usage", 42.5);
-```
-
-### Native File Globbing (`node:fs/promises`):
-
-```ts
-import { glob } from "node:fs/promises";
-
-for await (const entry of glob("src/**/*.ts")) {
-  console.log("Found:", entry);
-}
-```
-
----
-
-## 5. Cross-Platform Scripting Standards
-
-Ensure Node.js utilities and automation scripts run identically across macOS and Windows 11:
-
-- **Path Normalization**:
-  - Always use `node:path` methods (`path.join`, `path.resolve`, `path.relative`) rather than raw string concatenation.
-  - Convert file URLs using `fileURLToPath(import.meta.url)`.
-  - Use `import.meta.dirname` and `import.meta.filename` in ESM; use `node:os` `homedir()` instead of `~`.
-- **POSIX Slashes in Glob Patterns**:
-  - Always pass POSIX forward slashes `/` to glob APIs (`node:fs/promises` `glob`, `fast-glob`, etc.).
-  - If a path was constructed via `path.join` on Windows, normalize it before globbing: `pattern.replace(/\\/g, "/")`.
+- **Path Composition**:
+  - Always use `node:path` methods (`path.join()`, `path.resolve()`, `path.relative()`).
+  - Use `fileURLToPath(import.meta.url)` and `import.meta.dirname` in ESM.
+  - In all glob patterns, enforce POSIX forward slashes `/` (`pattern.replace(/\\/g, "/")`).
 - **Cross-Platform `package.json` Scripts**:
-  - Avoid shell-specific builtins (`rm -rf`, `export VAR=val`, `set VAR=val`):
-    ```json
-    {
-      "scripts": {
-        "build": "vite build --emptyOutDir",
-        "clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\""
-      }
-    }
-    ```
-- **Cross-Platform Environment Variable Loading**:
-  - Load environment variables without third-party CLI wrappers using Node.js built-in:
-    ```ts
-    // Node.js 20.6+ native env loader
-    process.loadEnvFile();
-    ```
-- **Process Safety & Argument Arrays**:
-  - Avoid `child_process.exec()` with string concatenation, which suffers from quoting differences between Windows `cmd`/`pwsh` and macOS `zsh`.
-  - Always prefer `execFileSync` or `spawnSync` with an array of arguments and `{ shell: false }`.
-- **Headless & Universal Subshell Stdin Safety**:
-  - Default non-interactive CLI modes in scripts (`--no-color` / `NO_COLOR=1`).
-  - Never prompt for stdin in headless automation scripts, as background subshells on Windows and macOS pipe stdin and will hang indefinitely.
+  - Prohibit OS-specific builtins (`rm -rf`, `export VAR=val`, `set VAR=val`).
+  - Use cross-platform Node.js one-liners: `node -e "fs.rmSync('dist', { recursive: true, force: true })"`.
+- **Process Safety**:
+  - Always invoke child processes via `execFileSync` or `spawnSync` with an argument array and `{ shell: false }`. Avoid string-concatenated shell execution.
+  - Headless Stdin: Never prompt for standard input in automated scripts to prevent background subshell hangs.
