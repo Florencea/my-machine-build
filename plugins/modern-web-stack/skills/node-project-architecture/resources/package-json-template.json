@@ -10,7 +10,7 @@
     "agent:test:e2e": "vp test run --project e2e --reporter=tap-flat --no-color",
     "agent:test:unit": "vp test run --project unit --reporter=tap-flat --no-color",
     "agent:verify:gate": "vpr agent:verify:unit && vp build && vpr agent:test:e2e",
-    "agent:verify:inner": "vpr typecheck && vp lint && vpr lint:tailwind",
+    "agent:verify:inner": "vpr typecheck && vp lint && vpr agent:lint:tailwind",
     "agent:verify:unit": "vpr agent:verify:inner && vpr agent:test:unit",
     "build": "vp build",
     "check:deadcode": "knip",
@@ -23,10 +23,9 @@
     "test:setup": "playwright install chromium",
     "test:unit": "vp test run --project unit",
     "typecheck": "tsc -b --pretty false",
-    "verify": "vp check && vpr lint:tailwind && vpr check:deadcode && vp test run && vp build"
+    "verify": "vp check && vpr agent:lint:tailwind && vpr check:deadcode && vp test run && vp build"
   },
   "engines": {
     "node": ">=26.0.0"
   }
 }
-

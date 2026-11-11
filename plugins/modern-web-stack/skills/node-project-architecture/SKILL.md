@@ -67,8 +67,17 @@ Standardize editor ergonomics to ensure seamless human-agent pair programming an
 
 Follow modern CI/CD governance to achieve deterministic verification and eliminate runner starvation:
 
+- **Centralized Workflows (`Florencea/vp-actions`)**:
+  - Standard Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`.
+  - Pass custom preparation hooks via `inputs.pre-test-command` (e.g. `vp run db:seed`) and optional matrix checks via `inputs.enable-platform-compat: true`.
+  - Specialized applications (desktop applications requiring virtual displays, custom platform packaging) consume modular Composite Actions:
+    - `Florencea/vp-actions/actions/setup-vp-env@v1`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
+    - `Florencea/vp-actions/actions/setup-playwright@v1`: Playwright browser cache, Chromium binary installation, and Linux system dependencies.
 - **Major Floating Tags Invariant**:
   - Always reference GitHub Actions via their authoritative Major floating tag:
+    - `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`
+    - `Florencea/vp-actions/actions/setup-vp-env@v1`
+    - `Florencea/vp-actions/actions/setup-playwright@v1`
     - `actions/checkout@v7`
     - `voidzero-dev/setup-vp@v1`
     - `actions/cache@v6`
@@ -101,11 +110,16 @@ In `package.json`, adopt the standard **three-tier gatekeeper architecture**:
 ```json
 {
   "scripts": {
+    "agent:lint:ci": "actionlint",
+    "agent:lint:fix": "vp check --fix",
+    "agent:lint:tailwind": "node scripts/lint-tailwind.ts",
+    "agent:lint:tailwind:fix": "node scripts/lint-tailwind.ts --fix",
     "agent:test:e2e": "vp test run --project e2e --reporter=tap-flat --no-color",
     "agent:test:unit": "vp test run --project unit --reporter=tap-flat --no-color",
     "agent:verify:gate": "vpr agent:verify:unit && vp build && vpr agent:test:e2e",
-    "agent:verify:inner": "vpr typecheck && vp lint && vpr lint:tailwind",
+    "agent:verify:inner": "vpr typecheck && vp lint && vpr agent:lint:tailwind",
     "agent:verify:unit": "vpr agent:verify:inner && vpr agent:test:unit",
+    "build": "vp build",
     "check:deadcode": "knip",
     "check:fast": "vpr typecheck && vp lint && vpr agent:test:unit",
     "lint:ci": "actionlint",
@@ -115,14 +129,14 @@ In `package.json`, adopt the standard **three-tier gatekeeper architecture**:
     "test:setup": "playwright install chromium",
     "test:unit": "vp test run --project unit",
     "typecheck": "tsc -b --pretty false",
-    "verify": "vp check && vpr lint:tailwind && vpr check:deadcode && vp test run && vp build"
+    "verify": "vp check && vpr agent:lint:tailwind && vpr check:deadcode && vp test run && vp build"
   }
 }
 ```
 
 ### Gatekeeper Hierarchy:
 
-1. **Tier 1 (Inner Loop - `agent:verify:inner`)**: Runs `vpr typecheck` + `vp lint` + `vpr lint:tailwind`. Ultra-fast feedback loop during active editing (< 2s).
+1. **Tier 1 (Inner Loop - `agent:verify:inner`)**: Runs `vpr typecheck` + `vp lint` + `vpr agent:lint:tailwind`. Ultra-fast feedback loop during active editing (< 2s).
 2. **Tier 2 (Unit Verification - `agent:verify:unit`)**: Runs `agent:verify:inner` + `agent:test:unit`. Validates functionality without build overhead.
 3. **Tier 3 (Gatekeeper - `agent:verify:gate` or `vpr verify`)**: Runs comprehensive gate (`unit` + `build` + `e2e` + `deadcode`). Mandatory before completing substantial features.
 4. **Task Caching Acceleration**: Scripts executed via `vpr` leverage Vite Task caching (`run.cache: { scripts: true }`). Replay unmodified steps in milliseconds. Use `vpr --last-details` to inspect cache hit status or `vp cache clean` / `vpr --no-cache` to force a clean run.
