@@ -20,10 +20,10 @@ All Antigravity customizations are packaged as **Plugins** under `plugins/<plugi
   - `plugin.json`: Manifest for macOS platform bundle.
   - `rules/AGENTS.md`: macOS Darwin execution rules, subshell stdin defense, Zsh nomatch guardrails, APFS CoW cloning, BSD traps, and Darwin diagnostics.
   - `skills/macos-toolchain/SKILL.md`: Subshell stdin recipes, Zsh glob patterns, APFS cloning, BSD workarounds, Darwin system automation, and PowerShell 7 symlink resolution.
-- **`plugins/win11-modern-tools/`** (Windows 11 only):
-  - `plugin.json`: Manifest for Windows 11 platform bundle.
-  - `rules/AGENTS.md`: Windows 11 platform rules, subshell stdin protection, PowerShell 5.1 vs 7 isolation, and Dev Drive optimization.
-  - `skills/win11-toolchain/SKILL.md`: Windows 11 subshell stdin defense recipes, PowerShell compatibility, and array unwrapping guard.
+- **`plugins/windows-modern-tools/`** (Windows 11 & Windows 10 IoT LTSC):
+  - `plugin.json`: Manifest for Windows platform bundle.
+  - `rules/AGENTS.md`: Windows platform rules, subshell stdin protection, PowerShell 5.1 vs 7 isolation, and Dev Drive optimization.
+  - `skills/windows-toolchain/SKILL.md`: Windows subshell stdin defense recipes, PowerShell compatibility, and array unwrapping guard.
 - **`plugins/modern-web-stack/`** (Shared across macOS & Windows 11):
   - `plugin.json`: Manifest for cross-platform web development stack.
   - `rules/AGENTS.md`: Consolidated always-on rules for Node.js, TypeScript 5+, React 19, Tailwind CSS v4, Vitest Browser testing, and GitHub Actions CI (`actionlint`).

@@ -1,4 +1,4 @@
-# Windows 11 Platform Execution Rules & Safety Guardrails
+# Windows Platform Execution Rules & Safety Guardrails (Windows 11 & Windows 10 IoT LTSC)
 
 ## 1. PowerShell 7 (`pwsh`) Execution & Double-Shell Invocation Protocol
 
@@ -61,6 +61,7 @@
     ```
 - **Ban on Ambiguous Wildcards**:
   - Never use unanchored wildcards (`"$src\*"` or `*.*`) with unverified destination paths. Explicit directory structures must be pre-created via `New-Item -ItemType Directory -Force` before copy operations.
+  - For directory synchronization or batch copying, enumerate child items explicitly using `Get-ChildItem -LiteralPath $src` and copy each item via `-LiteralPath $_.FullName` to `-Destination $dest`.
 
 ---
 
@@ -70,6 +71,7 @@
   - **Dev Drive (ReFS)**: Supported exclusively on Windows 11 Build 22621+. Dev Drive (`fsutil devdrv`) is strictly unavailable on Windows 10 IoT LTSC. On Windows 10, use standard NTFS storage (`$HOME\_Workspace`, `~/.vite-plus`) without attempting Dev Drive queries.
   - **Sudo Command**: Native `sudo.exe` requires Windows 11 Build 26052+. On Windows 10 IoT LTSC, privileged operations must use `Start-Process -Verb RunAs` or self-elevating scripts.
   - **PowerShell 7 AppX Barrier**: On Windows 10, the in-box `Appx` module throws `PlatformNotSupportedException` (`0x80131539`) under PowerShell 7 (.NET Core). AppX queries or package installations must be delegated to Windows PowerShell 5.1 (`powershell.exe -NoLogo -NoProfile -Command "..."`).
+  - **WinGet Bootstrap Matrix**: Windows 11 provides in-box DesktopAppInstaller. Windows 10 IoT LTSC requires dependency bootstrapping (VCLibs, WindowsAppRuntime, AppXSvc service enablement, and AppModelUnlock sideloading).
 - **Dev Drive Optimization (Windows 11 Only)**:
   - Dev Drive volumes formatted with ReFS support Copy-on-Write (Block Cloning) and disable synchronous filter drivers. Prioritize placing package caches (`PNPM_HOME`, `VITE_CACHE_DIR`) and Git workspaces on Dev Drive.
 - **Windows Defender Process Exclusion**:

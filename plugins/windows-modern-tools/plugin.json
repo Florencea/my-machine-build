@@ -1,0 +1,4 @@
+{
+  "name": "windows-modern-tools",
+  "description": "Windows platform execution rules for Windows 11 and Windows 10 IoT LTSC, subshell stdin safety guardrails, PowerShell 5.1 vs 7 runtime isolation, and Dev Drive optimization."
+}

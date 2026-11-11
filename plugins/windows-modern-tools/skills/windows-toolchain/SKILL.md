@@ -1,10 +1,10 @@
 ---
-name: win11-toolchain
-description: Windows 11 platform execution rules, subshell stdin safety guardrails, PowerShell 5.1 vs 7 runtime isolation, double-shell quote-stripping defense, defensive path assertions, binary inspection protocol, and Git-first disaster recovery. Use when executing commands, debugging scripts, or configuring environment settings on Windows 11.
-compatibility: Windows 11, PowerShell 7+, Vite+
+name: windows-toolchain
+description: Windows platform execution rules for Windows 11 and Windows 10 IoT LTSC, subshell stdin safety guardrails, PowerShell 5.1 vs 7 runtime isolation, double-shell quote-stripping defense, defensive path assertions, binary inspection protocol, and Git-first disaster recovery. Use when executing commands, debugging scripts, or configuring environment settings on Windows.
+compatibility: Windows 11, Windows 10 IoT LTSC, PowerShell 7+, PowerShell 5.1, Vite+
 ---
 
-# Windows 11 Platform Toolchain & Execution Guidelines
+# Windows Platform Toolchain & Execution Guidelines (Windows 11 & Windows 10 IoT LTSC)
 
 > [!NOTE]
 > For universal CLI binaries (`rg`, `fd`, `bat`, `sd`, `jq`, `yq`, `duckdb`, `xsv`, `xh`, Vite+), refer to the **`common-toolchain`** skill.
@@ -48,11 +48,65 @@ In Antigravity's Windows execution environment, the host shell is **Windows Powe
   - Prioritize placing workspace repositories and package caches on Dev Drive (`E:\_Workspace`, `VP_HOME = E:\vite-plus`).
 - **Windows 10 IoT LTSC Fallback**:
   - Dev Drive (`fsutil devdrv`) is strictly unavailable. Use standard NTFS storage (`$HOME\_Workspace`, `VP_HOME = $HOME\.vite-plus`) without querying `fsutil devdrv`.
-  - AppX module: On Windows 10, run AppX package queries via Windows PowerShell 5.1 (`powershell.exe`) due to .NET Core `PlatformNotSupportedException` in PS 7.
+  - Native `sudo.exe` is absent on Windows 10. Operations requiring elevation must use `Start-Process -Verb RunAs` or self-elevating script wrappers.
+  - WinGet must be bootstrapped with framework dependencies (VCLibs, WindowsAppRuntime) and `AppXSvc` enablement.
 
 ---
 
-## 3. Windows Defender Developer Exclusions
+## 3. Windows 10 IoT LTSC: PowerShell 7 AppX Barrier & Cmdlet Delegation
+
+On Windows 10, the in-box `Appx` PowerShell module cannot run under .NET Core (PowerShell 7+), throwing `PlatformNotSupportedException` (`0x80131539`).
+
+When inspecting or managing AppX packages from PowerShell 7 on Windows 10, delegate the call to Windows PowerShell 5.1 and deserialize JSON output:
+
+```powershell
+function Get-AppxPackageCompat {
+    param(
+        [string]$Name,
+        [switch]$AllUsers
+    )
+    $isWin10 = ([System.Environment]::OSVersion.Version.Major -eq 10 -and [System.Environment]::OSVersion.Version.Build -lt 22000)
+    if ($isWin10 -and ($PSVersionTable.PSEdition -eq 'Core')) {
+        $allArg = if ($AllUsers) { '-AllUsers' } else { '' }
+        $cmd = "Get-AppxPackage -Name '$Name' $allArg | Select-Object -Property Name, PackageFullName, InstallLocation | ConvertTo-Json -Compress"
+        $raw = (& powershell.exe -NoLogo -NoProfile -Command $cmd 2>$null)
+        if ($raw) {
+            return ($raw | ConvertFrom-Json)
+        }
+        return $null
+    }
+    if ($AllUsers) {
+        return (Get-AppxPackage -Name $Name -AllUsers -ErrorAction SilentlyContinue)
+    }
+    return (Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue)
+}
+```
+
+---
+
+## 4. Safe Directory Copying Without Unanchored Wildcards
+
+Avoid using unanchored wildcards (`Copy-Item -Path (Join-Path $src '*')`). Enumerate child items explicitly using `-LiteralPath` to prevent glob expansion failures on paths containing square brackets:
+
+```powershell
+if ([string]::IsNullOrWhiteSpace($src) -or -not (Test-Path -LiteralPath $src)) {
+    throw "Source directory missing or invalid: '$src'"
+}
+if ([string]::IsNullOrWhiteSpace($dest)) {
+    throw "Destination directory cannot be empty"
+}
+if (Test-Path -LiteralPath $dest) {
+    Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
+}
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+Get-ChildItem -LiteralPath $src | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
+}
+```
+
+---
+
+## 5. Windows Defender Developer Exclusions
 
 In local development environments, verify that modern toolchain executables and build directories are excluded from real-time monitoring to prevent file-locking hangs and I/O bottlenecks:
 
@@ -61,7 +115,7 @@ In local development environments, verify that modern toolchain executables and 
 
 ---
 
-## 4. Array Unrolling & String Indexing Guard
+## 6. Array Unrolling & String Indexing Guard
 
 PowerShell pipelines unroll single-item outputs into scalar objects. Indexing `[0]` on a scalar `System.String` returns a single `[char]`. Always wrap pipeline or filtering expressions in `@(...)`:
 
@@ -74,7 +128,7 @@ if ($lines.Count -gt 0) {
 
 ---
 
-## 5. Defensive Path Assertions & Fail-Fast Header
+## 7. Defensive Path Assertions & Fail-Fast Header
 
 Every script block executed via `pwsh -Command` or `-EncodedCommand` must begin with strict error stopping:
 

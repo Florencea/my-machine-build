@@ -1,4 +1,0 @@
-{
-  "name": "win11-modern-tools",
-  "description": "Windows 11 platform execution rules, subshell stdin safety guardrails, PowerShell 5.1 vs 7 runtime isolation, and Dev Drive optimization."
-}

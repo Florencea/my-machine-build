@@ -812,14 +812,20 @@ if ($PSVersionTable.PSEdition -ne 'Core' -and (Get-Command pwsh -ErrorAction Sil
     }
 }
 
-# 8. Sync Antigravity Plugins (common-modern-tools, win11-modern-tools & modern-web-stack)
+# 8. Sync Antigravity Plugins (common-modern-tools, windows-modern-tools & modern-web-stack)
 Write-Output '[8/9] Syncing Antigravity Plugins...'
 $pluginsDestRoot = Join-Path $HOME '.gemini\config\plugins'
 if (-not (Test-Path -LiteralPath $pluginsDestRoot)) {
     New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
 }
 
-foreach ($pluginName in @('common-modern-tools', 'win11-modern-tools', 'modern-web-stack')) {
+# Clean up legacy win11-modern-tools plugin if present to prevent duplicate rules/skills
+$legacyWin11Plugin = Join-Path $pluginsDestRoot 'win11-modern-tools'
+if (Test-Path -LiteralPath $legacyWin11Plugin) {
+    Remove-Item -LiteralPath $legacyWin11Plugin -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+foreach ($pluginName in @('common-modern-tools', 'windows-modern-tools', 'modern-web-stack')) {
     $srcPlugin = Join-Path $repoRoot "plugins\$pluginName"
     $destPlugin = Join-Path $pluginsDestRoot $pluginName
     if (Test-Path -LiteralPath $srcPlugin) {
@@ -827,7 +833,9 @@ foreach ($pluginName in @('common-modern-tools', 'win11-modern-tools', 'modern-w
             Remove-Item -LiteralPath $destPlugin -Recurse -Force -ErrorAction SilentlyContinue
         }
         New-Item -ItemType Directory -Force -Path $destPlugin | Out-Null
-        Copy-Item -Path (Join-Path $srcPlugin '*') -Destination $destPlugin -Recurse -Force
+        Get-ChildItem -LiteralPath $srcPlugin | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $destPlugin -Recurse -Force
+        }
     }
 }
 
