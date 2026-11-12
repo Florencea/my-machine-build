@@ -600,9 +600,8 @@ $desktopPackages = @(
     @{ Id = 'Microsoft.VisualStudioCode'; Name = 'Visual Studio Code' },
     @{ Id = 'Microsoft.WindowsTerminal'; Name = 'Windows Terminal' },
     @{ Id = 'AgileBits.1Password'; Name = '1Password' },
-    @{ Id = 'WinMerge.WinMerge'; Name = 'WinMerge' },
     @{ Id = 'RevoUninstaller.RevoUninstaller'; Name = 'Revo Uninstaller' },
-    @{ Id = '7zip.7zip'; Name = '7-Zip' },
+    @{ Id = 'M2Team.NanaZip'; Name = 'NanaZip' },
     @{ Id = 'ImageOptim.gifski'; Name = 'gifski' }
 )
 foreach ($pkg in $desktopPackages) {
