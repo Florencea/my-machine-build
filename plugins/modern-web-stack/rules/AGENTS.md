@@ -50,7 +50,7 @@ description: Modern Web Stack execution constraints (Node.js pure ESM, React 19,
   - Component and E2E tests must use `vite-plus/test` and `vite-plus/test/browser-playwright` (`headless: true`, `chromium`).
   - Three-Tier Verification: Tier 1 (`vpr typecheck && vp lint && vpr lint:tailwind`), Tier 2 (`agent:verify:inner && vpr agent:test:unit`), Tier 3 (`agent:verify:gate` / `vpr verify`).
 - **GitHub Actions CI Mandate**:
-  - Floating tags: Reference major floating tags (`actions/checkout@v7`, `voidzero-dev/setup-vp@v1`, `actions/cache@v6`).
+  - Exact version pinning: Pin GitHub Actions and reusable workflows to exact SemVer tags (`actions/checkout@v7.0.1`, `voidzero-dev/setup-vp@v1.22.0`, `actions/cache@v6.1.0`), avoiding floating major tags (`@v1`, `@v7`); manage upgrades via `up`.
   - Concurrency & timeouts: Declare top-level `concurrency` (`group: ${{ github.workflow }}-${{ github.ref }}`) and `timeout-minutes: 15`.
   - Mandatory local `actionlint`: Run `actionlint` locally before staging (`git add`) with 0 errors and 0 warnings.
 

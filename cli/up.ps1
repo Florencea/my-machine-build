@@ -1,7 +1,7 @@
 #!/usr/bin/env -S pwsh -NoLogo -NoProfile
 <#
 .SYNOPSIS
-    Check and update Node.js / Vite+ package dependencies and GitHub Actions major versions with automated verification and rollback.
+    Check and update Node.js / Vite+ package dependencies and GitHub Actions exact versions with automated verification and rollback.
 .DESCRIPTION
     Cross-platform Node.js dependency and GitHub Actions updater for macOS and Windows 11 (PowerShell 7).
 #>
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 
 function Show-Help {
     Write-Output @'
-up: Check and update Node.js package dependencies and GitHub Actions major versions with clean spinner feedback
+up: Check and update Node.js package dependencies and GitHub Actions exact versions with clean spinner feedback
 Usage: up
 '@
 }
@@ -135,7 +135,7 @@ function Invoke-Step {
 }
 
 function Restore-GitHubWorkflow {
-    # Prevent vp migrate from pinning floating setup-vp@v1 tags in CI workflows.
+    # Prevent vp migrate and vp fmt from modifying CI workflows during dependency updates.
     if (-not (Test-Path -LiteralPath '.github' -PathType Container)) {
         return
     }
@@ -179,6 +179,49 @@ function Find-GitHubActionFile {
     return @($matched | Sort-Object)
 }
 
+function ConvertFrom-GitHubActionVersion {
+    param(
+        [string]$Ref
+    )
+
+    if ($Ref -match '^(v)?(\d+)(?:\.(\d+)(?:\.(\d+))?)?$') {
+        $hasVPrefix = $Matches.ContainsKey(1) -and (-not [string]::IsNullOrEmpty($Matches[1]))
+        $hasMinor = $Matches.ContainsKey(3)
+        $hasPatch = $Matches.ContainsKey(4)
+        if ((-not $hasVPrefix) -and (-not $hasMinor)) {
+            return $null
+        }
+
+        $precision = $hasPatch ? 3 : ($hasMinor ? 2 : 1)
+        return [PSCustomObject]@{
+            Raw       = $Ref
+            Major     = [int]$Matches[2]
+            Minor     = $hasMinor ? [int]$Matches[3] : 0
+            Patch     = $hasPatch ? [int]$Matches[4] : 0
+            Precision = $precision
+        }
+    }
+
+    return $null
+}
+
+function Compare-GitHubActionVersion {
+    param(
+        [PSCustomObject]$Left,
+        [PSCustomObject]$Right
+    )
+
+    foreach ($field in @('Major', 'Minor', 'Patch', 'Precision')) {
+        $leftVal = [int]$Left.$field
+        $rightVal = [int]$Right.$field
+        if ($leftVal -ne $rightVal) {
+            return ($leftVal -gt $rightVal) ? 1 : -1
+        }
+    }
+
+    return 0
+}
+
 function Get-GitHubActionReference {
     param(
         [string[]]$FilePaths = @()
@@ -207,20 +250,20 @@ function Get-GitHubActionReference {
 
             if ($usesValue -match '^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/([^@]+))?@(.+)$') {
                 $repoSlug = $Matches[1]
-                $subpath = $Matches[2]
+                $subpath = $Matches.ContainsKey(2) ? $Matches[2] : ''
                 $currentRef = $Matches[3]
+                $currentVersion = ConvertFrom-GitHubActionVersion -Ref $currentRef
 
-                if ($currentRef -match '^v(\d+)(?:\.\d+(?:\.\d+)?)?$') {
-                    $currentMajor = [int]$Matches[1]
+                if ($null -ne $currentVersion) {
                     $actionTarget = $subpath ? "$repoSlug/$subpath" : $repoSlug
                     $references.Add(@{
-                            FilePath     = $relPath
-                            Line         = [int]$item['line']
-                            OldUses      = $usesValue
-                            RepoSlug     = $repoSlug
-                            ActionTarget = $actionTarget
-                            CurrentRef   = $currentRef
-                            CurrentMajor = $currentMajor
+                            FilePath       = $relPath
+                            Line           = [int]$item['line']
+                            OldUses        = $usesValue
+                            RepoSlug       = $repoSlug
+                            ActionTarget   = $actionTarget
+                            CurrentRef     = $currentRef
+                            CurrentVersion = $currentVersion
                         })
                 }
             }
@@ -230,7 +273,7 @@ function Get-GitHubActionReference {
     return @($references)
 }
 
-function Resolve-GitHubActionMajorVersion {
+function Resolve-GitHubActionLatestVersion {
     param(
         [string[]]$RepoSlugs = @()
     )
@@ -251,30 +294,27 @@ function Resolve-GitHubActionMajorVersion {
                 if ($code -ne 0) {
                     $errLine = ($output | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() } | Select-Object -First 1) ?? "exit code $code"
                     [PSCustomObject]@{
-                        RepoSlug    = $slug
-                        Success     = $false
-                        LatestMajor = $null
-                        Error       = $errLine
+                        RepoSlug = $slug
+                        Success  = $false
+                        Tags     = @()
+                        Error    = $errLine
                     }
                     return
                 }
 
-                $maxMajor = $null
+                $tags = [System.Collections.Generic.List[string]]::new()
                 foreach ($line in $output) {
                     $text = [string]$line
-                    if ($text -match '\trefs/tags/v(\d+)$') {
-                        $ver = [int]$Matches[1]
-                        if ($null -eq $maxMajor -or $ver -gt $maxMajor) {
-                            $maxMajor = $ver
-                        }
+                    if ($text -match '\trefs/tags/([^\s]+)$') {
+                        $tags.Add($Matches[1])
                     }
                 }
 
                 [PSCustomObject]@{
-                    RepoSlug    = $slug
-                    Success     = $true
-                    LatestMajor = $maxMajor
-                    Error       = ''
+                    RepoSlug = $slug
+                    Success  = $true
+                    Tags     = @($tags)
+                    Error    = ''
                 }
             } -ThrottleLimit 6)
     }
@@ -283,7 +323,25 @@ function Resolve-GitHubActionMajorVersion {
     }
 
     foreach ($res in $results) {
-        $resultMap[$res.RepoSlug] = $res
+        $latestVersion = $null
+        if ($res.Success) {
+            foreach ($tagName in $res.Tags) {
+                $parsed = ConvertFrom-GitHubActionVersion -Ref ([string]$tagName)
+                if ($null -eq $parsed) {
+                    continue
+                }
+                if (($null -eq $latestVersion) -or ((Compare-GitHubActionVersion -Left $parsed -Right $latestVersion) -gt 0)) {
+                    $latestVersion = $parsed
+                }
+            }
+        }
+
+        $resultMap[$res.RepoSlug] = [PSCustomObject]@{
+            RepoSlug      = $res.RepoSlug
+            Success       = $res.Success
+            LatestVersion = $latestVersion
+            Error         = $res.Error
+        }
     }
 
     return $resultMap
@@ -292,22 +350,23 @@ function Resolve-GitHubActionMajorVersion {
 function Get-GitHubActionUpdate {
     param(
         [hashtable[]]$References = @(),
-        [hashtable]$LatestMajorByRepo = @{}
+        [hashtable]$LatestVersionByRepo = @{}
     )
 
     $updates = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($refItem in $References) {
         $slug = [string]$refItem['RepoSlug']
-        if (-not $LatestMajorByRepo.ContainsKey($slug)) {
+        if (-not $LatestVersionByRepo.ContainsKey($slug)) {
             continue
         }
 
-        $latestMajor = [int]$LatestMajorByRepo[$slug]
-        $currentMajor = [int]$refItem['CurrentMajor']
+        $latestVersion = $LatestVersionByRepo[$slug]
+        $currentVersion = $refItem['CurrentVersion']
         $currentRef = [string]$refItem['CurrentRef']
-        $targetRef = "v$latestMajor"
+        $targetRef = [string]$latestVersion.Raw
+        $cmp = Compare-GitHubActionVersion -Left $latestVersion -Right $currentVersion
 
-        if (($latestMajor -ge $currentMajor) -and ($currentRef -ne $targetRef)) {
+        if (($cmp -gt 0) -or (($cmp -eq 0) -and ($currentRef -ne $targetRef))) {
             $actionTarget = [string]$refItem['ActionTarget']
             $updates.Add(@{
                     FilePath     = [string]$refItem['FilePath']
@@ -371,7 +430,7 @@ function Update-GitHubActionFile {
             }
         }
 
-        if ($fileModified -and $PSCmdlet.ShouldProcess($relPath, 'Update GitHub Actions major version references')) {
+        if ($fileModified -and $PSCmdlet.ShouldProcess($relPath, 'Update GitHub Actions version references')) {
             [System.IO.File]::WriteAllText($absPath, ($lines -join $eol), $utf8NoBom)
             $changedFiles.Add($relPath)
         }
@@ -423,7 +482,7 @@ if ($ncuRaw -and $ncuRaw.Trim() -notin @('', '{}')) {
 $hasDepUpdates = ($isVitePlus -and $vpToolchainUpgraded) -or ($ncuMap.Count -gt 0)
 
 $ciFiles = @(Find-GitHubActionFile)
-$latestMajorByRepo = @{}
+$latestVersionByRepo = @{}
 $ciUpdates = @()
 $ciDisplayEntries = [System.Collections.Generic.List[hashtable]]::new()
 $seenCiDisplayKeys = [System.Collections.Generic.HashSet[string]]::new()
@@ -432,19 +491,19 @@ if ($ciFiles.Count -gt 0) {
     $ciRefs = @(Get-GitHubActionReference -FilePaths $ciFiles)
     if ($ciRefs.Count -gt 0) {
         $repoSlugs = @($ciRefs | ForEach-Object { $_['RepoSlug'] })
-        $repoResults = Resolve-GitHubActionMajorVersion -RepoSlugs $repoSlugs
+        $repoResults = Resolve-GitHubActionLatestVersion -RepoSlugs $repoSlugs
 
         foreach ($slug in ($repoSlugs | Sort-Object -Unique)) {
             $res = $repoResults[$slug]
             if (-not $res.Success) {
                 [Console]::Error.WriteLine("Warning: Failed to query tags for ${slug}: $($res.Error)")
             }
-            elseif ($null -ne $res.LatestMajor) {
-                $latestMajorByRepo[$slug] = [int]$res.LatestMajor
+            elseif ($null -ne $res.LatestVersion) {
+                $latestVersionByRepo[$slug] = $res.LatestVersion
             }
         }
 
-        $ciUpdates = @(Get-GitHubActionUpdate -References $ciRefs -LatestMajorByRepo $latestMajorByRepo)
+        $ciUpdates = @(Get-GitHubActionUpdate -References $ciRefs -LatestVersionByRepo $latestVersionByRepo)
         foreach ($updateItem in $ciUpdates) {
             $actionTarget = [string]$updateItem['ActionTarget']
             $currentRef = [string]$updateItem['OldRef']
@@ -637,9 +696,9 @@ try {
             throw 'actionlint is not installed'
         }
 
-        $failedStep = 'Update GitHub Actions major versions'
+        $failedStep = 'Update GitHub Actions versions'
         $freshCiRefs = @(Get-GitHubActionReference -FilePaths $ciFiles)
-        $updatesToApply = @(Get-GitHubActionUpdate -References $freshCiRefs -LatestMajorByRepo $latestMajorByRepo)
+        $updatesToApply = @(Get-GitHubActionUpdate -References $freshCiRefs -LatestVersionByRepo $latestVersionByRepo)
 
         $changedCiFiles = @(Update-GitHubActionFile -Updates $updatesToApply)
         if ($changedCiFiles.Count -gt 0) {

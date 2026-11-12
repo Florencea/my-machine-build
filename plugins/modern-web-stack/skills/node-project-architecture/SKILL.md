@@ -22,7 +22,7 @@ Avoid monolithic, multi-thousand-line `AGENTS.md` files at the project root. Ins
 │   └── extensions.json       # Oxc + Vite+ extension recommendations
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml            # Fast gatekeeper CI with floating major tags & concurrency control
+│       ├── ci.yml            # Fast gatekeeper CI with exact SemVer tags & concurrency control
 │       └── node-canary.yml   # Node.js runtime canary check
 └── .agents/
     ├── rules/                # Domain-specific rules with glob triggers (Global rules handle CI/testing/runtime)
@@ -68,21 +68,21 @@ Standardize editor ergonomics to ensure seamless human-agent pair programming an
 Follow modern CI/CD governance to achieve deterministic verification and eliminate runner starvation:
 
 - **Centralized Workflows (`Florencea/vp-actions`)**:
-  - Standard Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`.
+  - Standard Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v2.0.0`.
   - Pass custom preparation hooks via `inputs.pre-test-command` (e.g. `vp run db:seed`) and optional matrix checks via `inputs.enable-platform-compat: true`.
   - Specialized applications (desktop applications requiring virtual displays, custom platform packaging) consume modular Composite Actions:
-    - `Florencea/vp-actions/actions/setup-vp-env@v1`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
-    - `Florencea/vp-actions/actions/setup-playwright@v1`: Playwright browser cache, Chromium binary installation, and Linux system dependencies.
-- **Major Floating Tags Invariant**:
-  - Always reference GitHub Actions via their authoritative Major floating tag:
-    - `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`
-    - `Florencea/vp-actions/actions/setup-vp-env@v1`
-    - `Florencea/vp-actions/actions/setup-playwright@v1`
-    - `actions/checkout@v7`
-    - `voidzero-dev/setup-vp@v1`
-    - `actions/cache@v6`
-    - `actions/upload-artifact@v7`
-  - Strictly avoid locking actions to granular minor or patch releases (e.g. never use `@v1.21.2` or `@v4`).
+    - `Florencea/vp-actions/actions/setup-vp-env@v2.0.0`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
+    - `Florencea/vp-actions/actions/setup-playwright@v2.0.0`: Playwright browser cache, Chromium binary installation, and Linux system dependencies.
+- **Exact SemVer Pinning Invariant**:
+  - Always pin GitHub Actions and shared workflows to exact stable SemVer tags (`vX.Y.Z`) and upgrade them via `up`:
+    - `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v2.0.0`
+    - `Florencea/vp-actions/actions/setup-vp-env@v2.0.0`
+    - `Florencea/vp-actions/actions/setup-playwright@v2.0.0`
+    - `actions/checkout@v7.0.1`
+    - `voidzero-dev/setup-vp@v1.22.0`
+    - `actions/cache@v6.1.0`
+    - `actions/upload-artifact@v7.0.2`
+  - Strictly avoid unpinned floating major or minor tags (e.g. never use `@v1` or `@v7.0`).
 - **Concurrency & Redundancy Policy**:
   - Workflows triggered by `push` and `pull_request` must declare top-level `concurrency` with `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
 - **Job Timeout Protection**:
@@ -95,7 +95,7 @@ Follow modern CI/CD governance to achieve deterministic verification and elimina
 - **Playwright Binary Caching**:
   - Cache Playwright browser binaries (`${{ env.PLAYWRIGHT_BROWSERS_PATH }}`) keyed to the Playwright CLI version.
 - **Artifact Retention**:
-  - Configure `actions/upload-artifact@v7` on failure with explicit `retention-days: 7` and `if-no-files-found: ignore`.
+  - Configure `actions/upload-artifact@v7.0.2` on failure with explicit `retention-days: 7` and `if-no-files-found: ignore`.
 - **Local Shift-Left CI Verification (`actionlint`)**:
   - Whenever `.github/workflows/` files are created or modified, run `vpr lint:ci` (`actionlint`) locally.
   - Must pass with **0 errors and 0 warnings** before staging (`git add`).
