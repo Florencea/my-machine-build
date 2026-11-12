@@ -6,7 +6,6 @@
 - [Stylus Configs](https://github.com/Florencea/my-machine-build/raw/main/configs/stylus.json)
 - [Tampermonkey Configs](https://github.com/Florencea/my-machine-build/raw/main/configs/tampermonkey.json)
 - [Immersive Translate](https://github.com/Florencea/my-machine-build/raw/main/configs/immersive-translate-config.json)
-- [Ubo mv2 Configs](https://github.com/Florencea/my-machine-build/raw/main/configs/ubo-config.txt)
 
 ## Table of Contents
 
