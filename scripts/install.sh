@@ -571,15 +571,44 @@ install_psscriptanalyzer() {
 install_psscriptanalyzer
 
 # 10. Vite+ Global CLI & Node.js Runtime Management
-if ! command -v vp >/dev/null 2>&1 && [[ ! -x "$HOME/.local/share/vite-plus/bin/vp" ]]; then
+[[ -f "$HOME/.config/vite-plus/env" ]] && . "$HOME/.config/vite-plus/env"
+
+local vp_home="${VP_HOME:-$HOME/.local/share/vite-plus}"
+if ! command -v vp >/dev/null 2>&1 && [[ ! -x "$vp_home/bin/vp" ]]; then
   curl -fsSL https://vite.plus | CI=true VP_NODE_MANAGER=yes VP_PM_MANAGER=yes bash >/dev/null 2>&1
+  [[ -f "$HOME/.config/vite-plus/env" ]] && . "$HOME/.config/vite-plus/env"
+  vp_home="${VP_HOME:-$HOME/.local/share/vite-plus}"
 fi
 
-# Ensure Active LTS is default and installed
-local vp_bin="${commands[vp]:-$HOME/.local/share/vite-plus/bin/vp}"
+# Ensure Active LTS is default, installed, and global oxfmt matches bundled vp version
+local vp_bin="${commands[vp]:-$vp_home/bin/vp}"
 if [[ -x "$vp_bin" ]]; then
   VP_LOG=error "$vp_bin" env default lts >/dev/null 2>&1
   VP_LOG=error "$vp_bin" env install lts >/dev/null 2>&1
+
+  local vp_pkg_json="$vp_home/current/node_modules/vite-plus/package.json"
+  if [[ ! -f "$vp_pkg_json" ]]; then
+    local vp_ver
+    vp_ver="$("$vp_bin" --version 2>/dev/null | awk '/^vp v/ { sub(/^v/, "", $2); print $2; exit }')"
+    if [[ -n "$vp_ver" && -f "$vp_home/$vp_ver/node_modules/vite-plus/package.json" ]]; then
+      vp_pkg_json="$vp_home/$vp_ver/node_modules/vite-plus/package.json"
+    fi
+  fi
+
+  if [[ -f "$vp_pkg_json" ]] && command -v jq >/dev/null 2>&1; then
+    local target_oxfmt_ver
+    target_oxfmt_ver="$(jq -r '(.dependencies.oxfmt // empty) | sub("^[^0-9]*"; "")' "$vp_pkg_json")"
+    if [[ -n "$target_oxfmt_ver" ]]; then
+      local vp_oxfmt_shim="$vp_home/bin/oxfmt"
+      local current_oxfmt_ver=""
+      if [[ -x "$vp_oxfmt_shim" ]]; then
+        current_oxfmt_ver="$("$vp_oxfmt_shim" --version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+/) { print $i; exit } }')"
+      fi
+      if [[ "$current_oxfmt_ver" != "$target_oxfmt_ver" ]]; then
+        VP_LOG=error "$vp_bin" install -g "oxfmt@$target_oxfmt_ver" >/dev/null 2>&1
+      fi
+    fi
+  fi
 fi
 
 # Clean up legacy standalone Node.js directory if present
