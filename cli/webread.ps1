@@ -10,7 +10,9 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $utf8NoBom
+$OutputEncoding = $utf8NoBom
 
 $scriptDir = $PSScriptRoot
 if (-not $scriptDir) {
@@ -151,20 +153,46 @@ $curlCmd = (Get-Command $curlBin).Source
 
 $nullDevice = $IsWindows ? 'NUL' : '/dev/null'
 $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+$acceptHeader = 'text/markdown, text/plain;q=0.95, text/html;q=0.9, application/xhtml+xml;q=0.8, application/json;q=0.7'
+$repoRoot = Split-Path -Parent $scriptDir
+
+function Resolve-GitHubRawUrl {
+    param(
+        [string]$UriText
+    )
+
+    if ($Raw) {
+        return $null
+    }
+
+    if ($UriText -match '^https?://github\.com/([^/]+)/([^/]+)/blob/([^?#]+)(?:\?.*)?(?:#.*)?$') {
+        $owner = $Matches[1]
+        $repo = $Matches[2]
+        $branchAndPath = $Matches[3]
+        return "https://raw.githubusercontent.com/$owner/$repo/$branchAndPath"
+    }
+
+    return $null
+}
 
 function Invoke-LocalParser {
     param(
         [string]$RawText,
-        [string]$SourceUrl
+        [string]$SourceUrl,
+        [string]$ContentType = ''
     )
 
-    if ((Test-Path -LiteralPath $parserScript -PathType Leaf) -and (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
+    $nodeModulesReady = Test-Path -LiteralPath (Join-Path $repoRoot 'node_modules' 'defuddle') -PathType Container
+    if ((Test-Path -LiteralPath $parserScript -PathType Leaf) -and $nodeModulesReady -and (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
         $parserArgs = @(
             'node',
             $parserScript,
             '--url', $SourceUrl,
             '--max-chars', [string]$MaxChars
         )
+        if ($ContentType) {
+            $parserArgs += @('--content-type', $ContentType)
+        }
         if ($Selector) {
             $parserArgs += @('--selector', $Selector)
         }
@@ -181,20 +209,45 @@ function Invoke-LocalParser {
         }
     }
 
-    [Console]::Error.WriteLine('Notice: webread-parser.ts unavailable or failed, outputting direct fetch.')
+    if (-not $nodeModulesReady) {
+        [Console]::Error.WriteLine("Notice: node_modules not installed in $repoRoot (run 'vp install'), outputting direct fetch.")
+    }
+    else {
+        [Console]::Error.WriteLine('Notice: webread-parser.ts unavailable or failed, outputting direct fetch.')
+    }
     return $RawText
 }
 
-function Invoke-CurlText {
+function Invoke-CurlPayload {
     param(
         [string[]]$CurlArgs
     )
 
-    $lines = @(& $curlCmd @CurlArgs 2>$null)
-    if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) {
-        return $null
+    $bodyFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $metaLine = (& $curlCmd @CurlArgs -o $bodyFile -w '%{http_code}`t%{content_type}`t%{url_effective}' 2>$null)
+        if ($LASTEXITCODE -ne 0 -or (-not (Test-Path -LiteralPath $bodyFile -PathType Leaf))) {
+            return $null
+        }
+
+        $bodyText = [System.IO.File]::ReadAllText($bodyFile, $utf8NoBom)
+        if ([string]::IsNullOrEmpty($bodyText)) {
+            return $null
+        }
+
+        $parts = ([string]$metaLine).Split("`t")
+        $contentType = $parts.Count -ge 2 ? $parts[1] : ''
+        $effectiveUrl = ($parts.Count -ge 3 -and $parts[2]) ? $parts[2] : ''
+
+        return [PSCustomObject]@{
+            Body         = $bodyText
+            ContentType  = $contentType
+            EffectiveUrl = $effectiveUrl
+        }
     }
-    return ($lines -join "`n")
+    finally {
+        Remove-Item -LiteralPath $bodyFile -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-WebreadContent {
@@ -218,9 +271,10 @@ function Get-WebreadContent {
             $probeUrl = "$origin$candidatePath"
             $statusCode = (& $curlCmd -sL -w '%{http_code}' -o $nullDevice $probeUrl)
             if ($statusCode -eq '200') {
-                $content = Invoke-CurlText -CurlArgs @('-fsL', '-A', $userAgent, $probeUrl)
-                if ($null -ne $content) {
-                    return (Invoke-LocalParser -RawText $content -SourceUrl $probeUrl)
+                $payload = Invoke-CurlPayload -CurlArgs @('-fsL', '-A', $userAgent, $probeUrl)
+                if ($null -ne $payload) {
+                    $resolvedUrl = $payload.EffectiveUrl ? $payload.EffectiveUrl : $probeUrl
+                    return (Invoke-LocalParser -RawText $payload.Body -SourceUrl $resolvedUrl -ContentType $payload.ContentType)
                 }
             }
         }
@@ -232,21 +286,34 @@ function Get-WebreadContent {
     if ($UseJina) {
         [Console]::Error.WriteLine('Notice: Using external Jina Reader service (r.jina.ai)...')
         $jinaUrl = "https://r.jina.ai/$UrlToFetch"
-        $content = Invoke-CurlText -CurlArgs @('-fsL', '--max-time', '15', '-H', 'X-No-Cache: true', $jinaUrl)
-        if ($null -ne $content -and ($content -notmatch 'Request failed with status code')) {
-            return (Invoke-LocalParser -RawText $content -SourceUrl $UrlToFetch)
+        $payload = Invoke-CurlPayload -CurlArgs @('-fsL', '--max-time', '15', '-H', 'X-No-Cache: true', $jinaUrl)
+        if ($null -ne $payload -and ($payload.Body -notmatch 'Request failed with status code')) {
+            $jinaContentType = $payload.ContentType ? $payload.ContentType : 'text/markdown'
+            return (Invoke-LocalParser -RawText $payload.Body -SourceUrl $UrlToFetch -ContentType $jinaContentType)
         }
         [Console]::Error.WriteLine('Notice: External Jina Reader unavailable, falling back to local reader...')
     }
 
-    # 3. Local-First Safe Fetch (Default)
-    $fetchedHtml = Invoke-CurlText -CurlArgs @('-fsL', '--max-time', '20', '-A', $userAgent, $UrlToFetch)
-    if ($null -eq $fetchedHtml) {
+    # 3. GitHub blob -> raw.githubusercontent.com rewrite for direct Markdown/source reading
+    $githubRawUrl = Resolve-GitHubRawUrl -UriText $UrlToFetch
+    if ($null -ne $githubRawUrl) {
+        $rawPayload = Invoke-CurlPayload -CurlArgs @('-fsL', '--max-time', '20', '-A', $userAgent, $githubRawUrl)
+        if ($null -ne $rawPayload) {
+            $resolvedRawUrl = $rawPayload.EffectiveUrl ? $rawPayload.EffectiveUrl : $githubRawUrl
+            $rawContentType = $rawPayload.ContentType ? $rawPayload.ContentType : 'text/plain'
+            return (Invoke-LocalParser -RawText $rawPayload.Body -SourceUrl $resolvedRawUrl -ContentType $rawContentType)
+        }
+    }
+
+    # 4. Local-First Safe Fetch with Content Negotiation (Default)
+    $fetchedPayload = Invoke-CurlPayload -CurlArgs @('-fsL', '--max-time', '20', '-A', $userAgent, '-H', "Accept: $acceptHeader", $UrlToFetch)
+    if ($null -eq $fetchedPayload) {
         [Console]::Error.WriteLine("Error: Failed to fetch content from $UrlToFetch")
         return $null
     }
 
-    return (Invoke-LocalParser -RawText $fetchedHtml -SourceUrl $UrlToFetch)
+    $resolvedFetchUrl = $fetchedPayload.EffectiveUrl ? $fetchedPayload.EffectiveUrl : $UrlToFetch
+    return (Invoke-LocalParser -RawText $fetchedPayload.Body -SourceUrl $resolvedFetchUrl -ContentType $fetchedPayload.ContentType)
 }
 
 $activeMode = $Llms ? 'llms' : 'local'

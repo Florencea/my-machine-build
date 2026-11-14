@@ -144,38 +144,32 @@ if (Get-Command 'shfmt' -ErrorAction SilentlyContinue) {
     }
 }
 
-# 3. TypeScript & Markdown Verification + Node.js Tests
-$tsFiles = @(
-    (Join-Path $repoRoot 'cli' 'helpers' 'webread-parser.ts'),
-    (Join-Path $repoRoot 'tests' 'webread-parser.test.ts')
-)
-$mdFiles = @(
-    (Join-Path $repoRoot 'AGENTS.md'),
-    (Join-Path $repoRoot '.agents' 'rules' 'cli-scripts.md')
-)
-
-if (Get-Command 'vpx' -ErrorAction SilentlyContinue) {
-    & vpx oxlint -f agent @tsFiles
-    if ($LASTEXITCODE -ne 0) {
-        $failures.Add('oxlint check failed')
-    }
-
-    $fmtTarget = $tsFiles + $mdFiles
-    if ($fixMode) {
-        & vpx oxfmt @fmtTarget
+# 3. Vite+ Check (Format, Type-Aware Lint, Typecheck) & Vitest Unit Tests
+if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
+    $hasVitePlus = Test-Path -LiteralPath (Join-Path $repoRoot 'node_modules' 'vite-plus') -PathType Container
+    if (-not $hasVitePlus) {
+        $failures.Add("node_modules/vite-plus missing in $repoRoot (run 'vp install')")
     }
     else {
-        & vpx oxfmt --check @fmtTarget
-    }
-    if ($LASTEXITCODE -ne 0) {
-        $failures.Add('oxfmt check failed')
-    }
-}
+        if ($fixMode) {
+            & vp -C $repoRoot check --fix
+        }
+        else {
+            & vp -C $repoRoot check
+        }
+        if ($LASTEXITCODE -ne 0) {
+            $failures.Add('vp check failed')
+        }
 
-if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
-    & vp node --test (Join-Path $repoRoot 'tests' 'webread-parser.test.ts')
-    if ($LASTEXITCODE -ne 0) {
-        $failures.Add('webread-parser.test.ts failed')
+        & vp -C $repoRoot run typecheck
+        if ($LASTEXITCODE -ne 0) {
+            $failures.Add('vp run typecheck failed')
+        }
+
+        & vp -C $repoRoot test run --reporter=tap-flat --no-color
+        if ($LASTEXITCODE -ne 0) {
+            $failures.Add('vp test run failed')
+        }
     }
 }
 

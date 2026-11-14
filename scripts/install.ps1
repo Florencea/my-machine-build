@@ -604,6 +604,13 @@ if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
             }
         }
     }
+
+    $repoPkgJson = Join-Path $repoRoot 'package.json'
+    $repoLockFile = Join-Path $repoRoot 'pnpm-lock.yaml'
+    if ((Test-Path -LiteralPath $repoPkgJson -PathType Leaf) -and (Test-Path -LiteralPath $repoLockFile -PathType Leaf)) {
+        Write-Output '      Installing repository Node.js dependencies via Vite+...'
+        & vp -C $repoRoot install --frozen-lockfile
+    }
 }
 
 # 4. WinGet Bootstrap & Package Installation

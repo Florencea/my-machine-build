@@ -579,6 +579,7 @@ configure_launch_services() {
 }
 
 setup_vite_plus() {
+  local repo_dir="${1:-}"
   [[ -f "$HOME/.config/vite-plus/env" ]] && . "$HOME/.config/vite-plus/env"
 
   local vp_home="${VP_HOME:-$HOME/.local/share/vite-plus}"
@@ -615,6 +616,9 @@ setup_vite_plus() {
           VP_LOG=error "$vp_bin" install -g "oxfmt@$target_oxfmt_ver" >/dev/null 2>&1
         fi
       fi
+    fi
+    if [[ -n "$repo_dir" && -f "$repo_dir/package.json" && -f "$repo_dir/pnpm-lock.yaml" ]]; then
+      VP_LOG=error "$vp_bin" -C "$repo_dir" install --frozen-lockfile >/dev/null 2>&1 || true
     fi
   fi
 
@@ -653,7 +657,7 @@ main() {
   install_packages
   configure_apps
   configure_launch_services
-  setup_vite_plus
+  setup_vite_plus "$repo_dir"
   restart_input_services
 }
 
