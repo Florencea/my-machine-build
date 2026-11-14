@@ -35,6 +35,15 @@ if ([string]::IsNullOrWhiteSpace($currentScript)) {
     $currentScript = $MyInvocation.MyCommand.Path
 }
 
+$scriptDir = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptDir) -and (-not [string]::IsNullOrWhiteSpace($currentScript))) {
+    $scriptDir = Split-Path -Parent $currentScript
+}
+if ([string]::IsNullOrWhiteSpace($scriptDir)) {
+    throw 'Failed to resolve script directory from $PSScriptRoot or $currentScript.'
+}
+$repoRoot = Split-Path -Parent $scriptDir
+
 # Resolve Windows 10 vs Windows 11 platform status safely across PS 5.1 and PS 7+
 $isWin = ($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows
 $isWindows10 = $false
@@ -665,11 +674,6 @@ Sync-SessionPath
 
 # 5. Global Git Configuration & Pre-Commit Safety Hook
 Write-Output '[5/9] Configuring Global Git Settings & Pre-Commit Hook...'
-$scriptDir = $PSScriptRoot
-if ([string]::IsNullOrWhiteSpace($scriptDir) -and (-not [string]::IsNullOrWhiteSpace($currentScript))) {
-    $scriptDir = Split-Path -Parent $currentScript
-}
-$repoRoot = Split-Path -Parent $scriptDir
 
 & git config --global user.name 'Florencea'
 & git config --global user.email 'bearflorencea@gmail.com'
