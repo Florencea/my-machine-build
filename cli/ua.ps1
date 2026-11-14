@@ -290,6 +290,7 @@ if (-not $SkipGit) {
 
                 [PSCustomObject]@{
                     Name    = $name
+                    Path    = $dir
                     Success = $isSuccess
                     Updated = $isUpdated
                     Output  = $outText
@@ -298,14 +299,45 @@ if (-not $SkipGit) {
 
         $updatedCount = @($results | Where-Object { $_.Updated }).Count
         $failedCount = @($results | Where-Object { -not $_.Success }).Count
+        $syncTargets = [System.Collections.Generic.List[pscustomobject]]::new()
 
         foreach ($res in $results) {
             if (-not $res.Success) {
                 $errDetail = ($res.Output -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -First 1) ?? 'unknown error'
                 [Console]::Error.WriteLine("Sync $($res.Name) failed: $errDetail")
             }
-            elseif ($res.Updated) {
-                Write-Output "Sync $($res.Name) updated"
+            else {
+                if ($res.Updated) {
+                    Write-Output "Sync $($res.Name) updated"
+                }
+                if (Test-WorkspaceNodeSyncTarget -RepoPath $res.Path -PullUpdated ([bool]$res.Updated)) {
+                    $syncTargets.Add($res)
+                }
+            }
+        }
+
+        if ($syncTargets.Count -gt 0) {
+            if (-not (Test-RequiredCommand -Name 'vp')) {
+                exit 1
+            }
+
+            $prevVpLog = $env:VP_LOG
+            $env:VP_LOG = 'error'
+            try {
+                foreach ($target in $syncTargets) {
+                    $depOut = @(& vp -C $target.Path install --frozen-lockfile --silent 2>&1)
+                    if ($LASTEXITCODE -ne 0) {
+                        $depErr = ($depOut | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() } | Select-Object -First 1) ?? "exit code $LASTEXITCODE"
+                        [Console]::Error.WriteLine("Sync $($target.Name) dependencies failed: $depErr")
+                        $failedCount++
+                    }
+                    else {
+                        Write-Output "Sync $($target.Name) dependencies ok"
+                    }
+                }
+            }
+            finally {
+                $env:VP_LOG = $prevVpLog
             }
         }
 

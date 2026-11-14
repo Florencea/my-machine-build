@@ -154,6 +154,92 @@ try {
     $webreadBadMax = Invoke-PwshCaptured -PwshArgs @('-NoLogo', '-NoProfile', '-File', (Join-Path $cliDir 'webread.ps1'), '--max-chars', 'abc', 'https://example.com')
     Assert-Condition -Name 'webread.ps1 rejects non-integer --max-chars' -Condition ($webreadBadMax.ExitCode -ne 0)
     Assert-Condition -Name 'webread.ps1 reports --max-chars validation error' -Condition ($webreadBadMax.Stderr -match 'Invalid integer for --max-chars')
+
+    # 6. Resolve-PlaywrightSyncStep tests
+    $pwEmptyDir = Join-Path $tempTestDir 'pw_empty'
+    New-Item -ItemType Directory -Force -Path $pwEmptyDir | Out-Null
+
+    $pwSetupStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        scripts         = @{ 'test:setup' = 'playwright install chromium' }
+        devDependencies = @{ playwright = '1.65.0' }
+    } -ProjectRoot $pwEmptyDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep uses test:setup when present' -Condition (($null -ne $pwSetupStep) -and ($pwSetupStep.Exe -eq 'vpr') -and (($pwSetupStep.Arguments -join ' ') -eq '--no-cache test:setup'))
+
+    $nonPwSetupStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        scripts         = @{ 'test:setup' = 'node scripts/seed-db.ts' }
+        devDependencies = @{ vitest = '5.1.0' }
+    } -ProjectRoot $pwEmptyDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep ignores unrelated test:setup' -Condition ($null -eq $nonPwSetupStep)
+
+    $pwBrowserDepStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        devDependencies = @{ '@vitest/browser-playwright' = '5.1.0' }
+    } -ProjectRoot $pwEmptyDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep falls back to vp exec playwright for @vitest/browser-playwright' -Condition (($null -ne $pwBrowserDepStep) -and ($pwBrowserDepStep.Exe -eq 'vp') -and (($pwBrowserDepStep.Arguments -join ' ') -eq 'exec playwright install chromium --no-progress'))
+
+    $pwCoreOnlyStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        dependencies = @{ 'playwright-core' = '1.65.0' }
+    } -ProjectRoot $pwEmptyDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep falls back to playwright-core when only core is declared' -Condition (($null -ne $pwCoreOnlyStep) -and ($pwCoreOnlyStep.Exe -eq 'vp') -and (($pwCoreOnlyStep.Arguments -join ' ') -eq 'exec playwright-core install chromium --no-progress'))
+
+    $pwBinDir = Join-Path $tempTestDir 'pw_bin'
+    $pwShimDir = Join-Path $pwBinDir 'node_modules' '.bin'
+    New-Item -ItemType Directory -Force -Path $pwShimDir | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $pwShimDir 'playwright.cmd'), '')
+    $pwShimStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        devDependencies = @{ vitest = '5.1.0' }
+    } -ProjectRoot $pwBinDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep detects node_modules/.bin playwright.cmd shim' -Condition (($null -ne $pwShimStep) -and ($pwShimStep.Exe -eq 'vp') -and (($pwShimStep.Arguments -join ' ') -eq 'exec playwright install chromium --no-progress'))
+
+    $noPwStep = Resolve-PlaywrightSyncStep -PackageJson @{
+        devDependencies = @{ vitest = '5.1.0' }
+    } -ProjectRoot $pwEmptyDir
+    Assert-Condition -Name 'Resolve-PlaywrightSyncStep returns null for non-Playwright projects' -Condition ($null -eq $noPwStep)
+
+    # 7. Resolve-ProjectVerifyStep tests
+    $gateSteps = @(Resolve-ProjectVerifyStep -ScriptsMap @{
+            'agent:verify:gate' = 'vpr agent:verify:unit && vp build && vpr agent:test:e2e'
+            'agent:verify:unit' = 'vpr agent:verify:inner && vpr agent:test:unit'
+            'agent:test:e2e'    = 'vp test run --project e2e'
+        })
+    Assert-Condition -Name 'Resolve-ProjectVerifyStep prioritizes agent:verify:gate' -Condition (($gateSteps.Count -eq 1) -and ($gateSteps[0].Exe -eq 'vpr') -and (($gateSteps[0].Arguments -join ' ') -eq 'agent:verify:gate'))
+
+    $fallbackSteps = @(Resolve-ProjectVerifyStep -ScriptsMap @{
+            'agent:verify:unit' = 'vpr agent:verify:inner && vpr agent:test:unit'
+            'build'             = 'vp build'
+            'agent:test:e2e'    = 'vp test run --project e2e'
+        })
+    Assert-Condition -Name 'Resolve-ProjectVerifyStep sequences unit, build, and e2e without gate' -Condition (($fallbackSteps.Count -eq 3) -and ($fallbackSteps[0].Arguments[0] -eq 'agent:verify:unit') -and ($fallbackSteps[1].Arguments[0] -eq 'build') -and ($fallbackSteps[2].Arguments[0] -eq 'agent:test:e2e'))
+
+    $unitOnlySteps = @(Resolve-ProjectVerifyStep -ScriptsMap @{
+            'agent:verify:unit' = 'vpr agent:verify:inner && vpr agent:test:unit'
+        })
+    Assert-Condition -Name 'Resolve-ProjectVerifyStep handles unit-only projects' -Condition (($unitOnlySteps.Count -eq 1) -and ($unitOnlySteps[0].Arguments[0] -eq 'agent:verify:unit'))
+
+    $emptyVerifySteps = @(Resolve-ProjectVerifyStep -ScriptsMap @{})
+    Assert-Condition -Name 'Resolve-ProjectVerifyStep returns empty array when no verify scripts exist' -Condition ($emptyVerifySteps.Count -eq 0)
+
+    # 8. Test-WorkspaceNodeSyncTarget tests
+    $nonNodeRepo = Join-Path $tempTestDir 'repo_non_node'
+    New-Item -ItemType Directory -Force -Path $nonNodeRepo | Out-Null
+    Assert-Condition -Name 'Test-WorkspaceNodeSyncTarget rejects repo without package.json' -Condition (-not (Test-WorkspaceNodeSyncTarget -RepoPath $nonNodeRepo -PullUpdated $true))
+
+    $noLockRepo = Join-Path $tempTestDir 'repo_no_lock'
+    New-Item -ItemType Directory -Force -Path $noLockRepo | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $noLockRepo 'package.json'), '{}')
+    Assert-Condition -Name 'Test-WorkspaceNodeSyncTarget rejects repo without lockfile' -Condition (-not (Test-WorkspaceNodeSyncTarget -RepoPath $noLockRepo -PullUpdated $true))
+
+    $freshCloneRepo = Join-Path $tempTestDir 'repo_fresh_clone'
+    New-Item -ItemType Directory -Force -Path $freshCloneRepo | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $freshCloneRepo 'package.json'), '{}')
+    [System.IO.File]::WriteAllText((Join-Path $freshCloneRepo 'pnpm-lock.yaml'), '')
+    Assert-Condition -Name 'Test-WorkspaceNodeSyncTarget initializes repo missing node_modules even without pull updates' -Condition (Test-WorkspaceNodeSyncTarget -RepoPath $freshCloneRepo -PullUpdated $false)
+
+    $installedRepo = Join-Path $tempTestDir 'repo_installed'
+    New-Item -ItemType Directory -Force -Path (Join-Path $installedRepo 'node_modules') | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $installedRepo 'package.json'), '{}')
+    [System.IO.File]::WriteAllText((Join-Path $installedRepo 'pnpm-lock.yaml'), '')
+    Assert-Condition -Name 'Test-WorkspaceNodeSyncTarget skips unchanged repo when node_modules exists' -Condition (-not (Test-WorkspaceNodeSyncTarget -RepoPath $installedRepo -PullUpdated $false))
+    Assert-Condition -Name 'Test-WorkspaceNodeSyncTarget syncs updated repo when node_modules exists' -Condition (Test-WorkspaceNodeSyncTarget -RepoPath $installedRepo -PullUpdated $true)
 }
 finally {
     if (Test-Path -LiteralPath $tempTestDir) {

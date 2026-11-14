@@ -687,12 +687,23 @@ try {
             }
         }
 
-        foreach ($s in @('agent:verify:unit', 'agent:test:unit', 'test:unit')) {
-            if ($scriptsMap.ContainsKey($s)) {
-                $failedStep = "vpr $s (unit-test)"
-                Invoke-Step -Message 'Verifying unit tests' -Exe 'vpr' -Arguments @($s)
-                break
+        $pwSyncStep = Resolve-PlaywrightSyncStep -PackageJson $pkgJson -ProjectRoot '.'
+        if ($null -ne $pwSyncStep) {
+            $failedStep = $pwSyncStep.StepLabel
+            $prevPwSkipGc = $env:PLAYWRIGHT_SKIP_BROWSER_GC
+            $env:PLAYWRIGHT_SKIP_BROWSER_GC = '1'
+            try {
+                Invoke-Step -Message 'Syncing Playwright browsers' -Exe $pwSyncStep.Exe -Arguments $pwSyncStep.Arguments
             }
+            finally {
+                $env:PLAYWRIGHT_SKIP_BROWSER_GC = $prevPwSkipGc
+            }
+        }
+
+        $verifySteps = @(Resolve-ProjectVerifyStep -ScriptsMap $scriptsMap)
+        foreach ($step in $verifySteps) {
+            $failedStep = $step.StepLabel
+            Invoke-Step -Message $step.Message -Exe $step.Exe -Arguments $step.Arguments
         }
 
         $depPendingChanges = (& git status --porcelain 2>$null)

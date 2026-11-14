@@ -228,6 +228,171 @@ function Invoke-YtDlpSegment {
     }
 }
 
+function Resolve-PlaywrightSyncStep {
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$PackageJson,
+        [string]$ProjectRoot = '.'
+    )
+
+    $scriptsMap = ($PackageJson['scripts'] -is [hashtable]) ? $PackageJson['scripts'] : @{}
+    $depSections = @(
+        (($PackageJson['dependencies'] -is [hashtable]) ? $PackageJson['dependencies'] : @{}),
+        (($PackageJson['devDependencies'] -is [hashtable]) ? $PackageJson['devDependencies'] : @{}),
+        (($PackageJson['optionalDependencies'] -is [hashtable]) ? $PackageJson['optionalDependencies'] : @{}),
+        (($PackageJson['peerDependencies'] -is [hashtable]) ? $PackageJson['peerDependencies'] : @{})
+    )
+
+    $hasFullPlaywrightDep = $false
+    $hasCoreOnlyDep = $false
+    foreach ($section in $depSections) {
+        foreach ($pkgName in @('playwright', '@playwright/test', '@vitest/browser-playwright')) {
+            if ($section.ContainsKey($pkgName)) {
+                $hasFullPlaywrightDep = $true
+            }
+        }
+        if ($section.ContainsKey('playwright-core')) {
+            $hasCoreOnlyDep = $true
+        }
+    }
+
+    $binDir = Join-Path $ProjectRoot 'node_modules' '.bin'
+    $hasPlaywrightBin = $false
+    foreach ($binName in @('playwright', 'playwright.cmd', 'playwright.ps1')) {
+        if (Test-Path -LiteralPath (Join-Path $binDir $binName) -PathType Leaf) {
+            $hasPlaywrightBin = $true
+            break
+        }
+    }
+
+    $hasCoreBin = $false
+    foreach ($binName in @('playwright-core', 'playwright-core.cmd', 'playwright-core.ps1')) {
+        if (Test-Path -LiteralPath (Join-Path $binDir $binName) -PathType Leaf) {
+            $hasCoreBin = $true
+            break
+        }
+    }
+
+    $hasAnyPlaywright = $hasFullPlaywrightDep -or $hasCoreOnlyDep -or $hasPlaywrightBin -or $hasCoreBin
+
+    if ($scriptsMap.ContainsKey('test:setup')) {
+        $setupCmd = [string]$scriptsMap['test:setup']
+        if ($hasAnyPlaywright -or ($setupCmd -match '\bplaywright\b')) {
+            return [PSCustomObject]@{
+                Exe       = 'vpr'
+                Arguments = @('--no-cache', 'test:setup')
+                StepLabel = 'vpr --no-cache test:setup'
+            }
+        }
+    }
+
+    if ($hasFullPlaywrightDep -or $hasPlaywrightBin) {
+        return [PSCustomObject]@{
+            Exe       = 'vp'
+            Arguments = @('exec', 'playwright', 'install', 'chromium', '--no-progress')
+            StepLabel = 'vp exec playwright install chromium'
+        }
+    }
+
+    if ($hasCoreOnlyDep -or $hasCoreBin) {
+        return [PSCustomObject]@{
+            Exe       = 'vp'
+            Arguments = @('exec', 'playwright-core', 'install', 'chromium', '--no-progress')
+            StepLabel = 'vp exec playwright-core install chromium'
+        }
+    }
+
+    return $null
+}
+
+function Resolve-ProjectVerifyStep {
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$ScriptsMap
+    )
+
+    $steps = [System.Collections.Generic.List[pscustomobject]]::new()
+    if ($ScriptsMap.ContainsKey('agent:verify:gate')) {
+        $steps.Add([PSCustomObject]@{
+                Exe       = 'vpr'
+                Arguments = @('agent:verify:gate')
+                Message   = 'Verifying gate (unit, build, e2e)'
+                StepLabel = 'vpr agent:verify:gate (gate)'
+            })
+        return @($steps)
+    }
+
+    foreach ($s in @('agent:verify:unit', 'agent:test:unit', 'test:unit')) {
+        if ($ScriptsMap.ContainsKey($s)) {
+            $steps.Add([PSCustomObject]@{
+                    Exe       = 'vpr'
+                    Arguments = @($s)
+                    Message   = 'Verifying unit tests'
+                    StepLabel = "vpr $s (unit-test)"
+                })
+            break
+        }
+    }
+
+    $e2eScript = ''
+    foreach ($s in @('agent:test:e2e', 'test:e2e')) {
+        if ($ScriptsMap.ContainsKey($s)) {
+            $e2eScript = $s
+            break
+        }
+    }
+
+    if ($e2eScript) {
+        foreach ($b in @('build:all', 'build')) {
+            if ($ScriptsMap.ContainsKey($b)) {
+                $steps.Add([PSCustomObject]@{
+                        Exe       = 'vpr'
+                        Arguments = @($b)
+                        Message   = 'Building project for E2E'
+                        StepLabel = "vpr $b (build)"
+                    })
+                break
+            }
+        }
+
+        $steps.Add([PSCustomObject]@{
+                Exe       = 'vpr'
+                Arguments = @($e2eScript)
+                Message   = 'Verifying E2E tests'
+                StepLabel = "vpr $e2eScript (e2e-test)"
+            })
+    }
+
+    return @($steps)
+}
+
+function Test-WorkspaceNodeSyncTarget {
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoPath,
+        [bool]$PullUpdated = $false
+    )
+
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoPath 'package.json') -PathType Leaf)) {
+        return $false
+    }
+
+    $hasLockfile = $false
+    foreach ($lockfile in @('pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'bun.lock', 'bun.lockb')) {
+        if (Test-Path -LiteralPath (Join-Path $RepoPath $lockfile) -PathType Leaf) {
+            $hasLockfile = $true
+            break
+        }
+    }
+
+    if (-not $hasLockfile) {
+        return $false
+    }
+
+    $hasNodeModules = Test-Path -LiteralPath (Join-Path $RepoPath 'node_modules') -PathType Container
+    return ($PullUpdated -or (-not $hasNodeModules))
+}
+
 Export-ModuleMember -Function @(
     'Resolve-CliScriptDirectory',
     'Test-RequiredCommand',
@@ -235,5 +400,8 @@ Export-ModuleMember -Function @(
     'ConvertTo-ValidatedInt',
     'Format-ByteSize',
     'Import-WindowsMachinePath',
-    'Invoke-YtDlpSegment'
+    'Invoke-YtDlpSegment',
+    'Resolve-PlaywrightSyncStep',
+    'Resolve-ProjectVerifyStep',
+    'Test-WorkspaceNodeSyncTarget'
 )
