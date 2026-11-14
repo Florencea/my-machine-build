@@ -1,56 +1,32 @@
 ---
 name: tanstack-router
-description: File-based routing, type-safe search parameters with Zod, routeTree protection, loaders, and navigation standards with TanStack Router. Use when creating or modifying client-side routes, handling query parameters, or configuring TanStack Router.
-compatibility: TanStack Router 1.x+, React 19, Vite+
+description: File-based routing, type-safe search parameters with Zod, routeTree protection, loaders, navigation invariants, and Markdown SSOT doc lookups for TanStack Router. Use when creating or modifying client-side routes or query parameters.
+compatibility: TanStack Router, React, Vite+, Zod
 ---
 
 # TanStack Router Guidelines
 
-## 1. Authoritative External Endpoints
+## 1. External SSOT & Local Declaration Gateways
 
-Query live documentation before modifying routes or data loading:
+`tanstack.com` HTML pages return empty anti-bot pages in `webread`; always read `.md` endpoints listed in `llms.txt` or local `.d.ts` declarations:
 
-- **Router Overview & Setup**: `webread https://tanstack.com/router/latest/docs/framework/react/overview`
-- **Search Parameters Guide**: `webread https://tanstack.com/router/latest/docs/framework/react/guide/search-params`
-- **Data Loading & Loaders**: `webread https://tanstack.com/router/latest/docs/framework/react/guide/data-loading`
+- **Two-Stage `webread` (`.md` Mandatory)**:
+  - Stage 1 (Index): `webread https://tanstack.com/router/latest/llms.txt`
+  - Stage 2 (Targeted Markdown): `webread https://tanstack.com/router/latest/docs/<path>.md` (e.g. `https://tanstack.com/router/latest/docs/guide/search-params.md`, `.../docs/guide/data-loading.md`, `.../docs/framework/react/overview.md`).
+- **Local Declarations**: Inspect `node_modules/@tanstack/react-router/**/*.d.ts` for exact hook, `createFileRoute`, and `validateSearch` options.
+- **Zod Verification**: Verify search parameter schema helpers against `https://zod.dev/llms.txt` → `https://zod.dev/api` (or `node_modules/zod/**/*.d.ts`).
 
 ---
 
 ## 2. Routing Architecture & File Invariants
 
-- **Route Directory SSOT**:
-  - Place all route files strictly under `src/routes/` (`__root.tsx`, `index.tsx`, `canary.tsx`, `$.tsx`).
-- **Protected Generated File Invariant**:
-  - `src/routeTree.gen.ts` is managed exclusively by `@tanstack/router-plugin/vite`.
-  - **STRICTLY PROHIBITED to manually edit `src/routeTree.gen.ts`**. It regenerates automatically during dev or build.
+- **Route Directory SSOT**: Place all route files strictly under `src/routes/` (`__root.tsx`, `index.tsx`, `$.tsx`).
+- **Protected Generated File**: `src/routeTree.gen.ts` is owned exclusively by `@tanstack/router-plugin/vite`. **STRICTLY PROHIBITED to manually edit `src/routeTree.gen.ts`**.
 
 ---
 
-## 3. Type-Safe Search Parameters (Zod First)
+## 3. Search Parameters, Loaders & Navigation Invariants
 
-Always validate search query parameters using Zod within `validateSearch`:
-
-```tsx
-import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
-
-const SearchSchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  query: z.string().default(""),
-});
-
-export const Route = createFileRoute("/items")({
-  validateSearch: (search) => SearchSchema.parse(search),
-  component: ItemsPage,
-});
-```
-
----
-
-## 4. Data Loading & Navigation
-
-- **Loaders over Effects**:
-  - Always load initial route data using `loader` functions rather than component `useEffect`.
-  - In projects using TanStack Query, prefetch server state ahead of render via `queryClient.ensureQueryData(queryOptions)`.
-- **Type-Safe Navigation**:
-  - Use `<Link>` and `useNavigate()` with type-checked `to` and `search` parameters.
+- **Zod-First `validateSearch`**: Validate and coerce every route search query parameter through a Zod schema in `validateSearch` rather than reading `window.location.search` manually.
+- **Loaders Over Effects**: Fetch initial route data inside `loader` (or prefetch with `queryClient.ensureQueryData(...)`) instead of triggering data fetches inside component `useEffect`.
+- **Type-Safe Navigation**: Use type-checked `<Link>` and `useNavigate()` with route `to` and `search` contracts.

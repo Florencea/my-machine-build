@@ -4,14 +4,14 @@ This document outlines the core architecture map, git delivery invariants, and m
 
 ## 1. Quick Architecture Map
 
-| Layer                    | Path                                            | Responsibility                                                                                                                                   |
-| :----------------------- | :---------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI Tools**            | `cli/*.ps1`, `cli/helpers/`                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands, shared helper module (`CliCommon.psm1`), and TypeScript helpers                               |
-| **Dotfiles & Configs**   | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                                                         |
-| **Antigravity Plugins**  | `plugins/`                                      | Cross-platform toolchain, platform & web stack bundles (`common-modern-tools`, `macos-modern-tools`, `windows-modern-tools`, `modern-web-stack`) |
-| **Installers**           | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                                                   |
-| **Verification & Tests** | `tests/`                                        | Unified formatting/AST/lint verifier (`verify.ps1`), PowerShell contract tests, and `node:test` suites                                           |
-| **Workspace Rules**      | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                                                                |
+| Layer                    | Path                                            | Responsibility                                                                                                                                                    |
+| :----------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI Tools**            | `cli/*.ps1`, `cli/helpers/`                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands, shared helper module (`CliCommon.psm1`), and TypeScript helpers                                                |
+| **Dotfiles & Configs**   | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                                                                          |
+| **Antigravity Plugins**  | `plugins/`                                      | Cross-platform toolchain, platform & web stack bundles (`common-modern-tools`, `macos-modern-tools`, `windows-modern-tools`, `modern-web-stack`)                  |
+| **Installers**           | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                                                                    |
+| **Verification & Tests** | `tests/`                                        | Unified formatting/AST/lint verifier (`verify.ps1`), PowerShell contract tests (`cli.Tests.ps1`), and Vitest suites (`webread-parser.test.ts`, `plugins.test.ts`) |
+| **Workspace Rules**      | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                                                                                 |
 
 ---
 
@@ -27,10 +27,11 @@ This document outlines the core architecture map, git delivery invariants, and m
     4. Output the exact `git commit -m "type(scope): concise imperative description"` command for manual execution by the user.
 - **Agent-Friendly Execution Formats**:
   - Prefer token-efficient structured flags during verification:
-    - Linting: `vp lint -f agent` (or `vpx oxlint -f agent`)
-    - Type check: `tsc -b --pretty false`
+    - Linting: `vp lint -f agent` (or `vpx oxlint -f agent`); inspect active rules via `vp lint --rules`
+    - Type check: `vpr typecheck` (or `tsc -b --pretty false`)
     - Combined check: `vp check --quiet`
-    - Dependencies: `vp list --json`, `vp outdated --format json`
+    - Dependencies: `vp pm list --json` (or `vp list --json`), `vp outdated --format json`
+    - Full repository gate: `pwsh -NoLogo -NoProfile -File tests/verify.ps1`
 - **Project Root Settings SSOT**:
   - Maintain `PSScriptAnalyzerSettings.psd1` directly in the project root (synchronized with `plugins/common-modern-tools/PSScriptAnalyzerSettings.psd1`) for zero-configuration VS Code discovery.
 

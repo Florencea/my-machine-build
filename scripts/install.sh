@@ -276,7 +276,12 @@ sync_plugin_dir() {
     fi
   else
     fetch_file "$repo_dir" "plugins/$plugin_name/plugin.json" "$dest_dir/plugin.json"
-    fetch_file "$repo_dir" "plugins/$plugin_name/rules/AGENTS.md" "$dest_dir/rules/AGENTS.md"
+    if [[ "$plugin_name" == "modern-web-stack" ]]; then
+      fetch_file "$repo_dir" "plugins/$plugin_name/rules/modern-web-stack.md" "$dest_dir/rules/modern-web-stack.md"
+      rm -f "$dest_dir/rules/AGENTS.md"
+    else
+      fetch_file "$repo_dir" "plugins/$plugin_name/rules/AGENTS.md" "$dest_dir/rules/AGENTS.md"
+    fi
   fi
 }
 
@@ -296,6 +301,21 @@ deploy_antigravity_plugins() {
     local skill
     for skill in "${web_skills[@]}"; do
       fetch_file "$repo_dir" "plugins/modern-web-stack/skills/$skill/SKILL.md" "$HOME/.gemini/config/plugins/modern-web-stack/skills/$skill/SKILL.md"
+    done
+    local -a arch_resources=(
+      ci-workflow-template.yml
+      ci-workflows-rule-template.md
+      lean-agents-template.md
+      lint-tailwind-template.ts
+      package-json-template.json
+      pnpm-workspace-template.yaml
+      vite-config-template.ts
+      vscode-extensions-template.json
+      vscode-settings-template.json
+    )
+    local res
+    for res in "${arch_resources[@]}"; do
+      fetch_file "$repo_dir" "plugins/modern-web-stack/skills/node-project-architecture/resources/$res" "$HOME/.gemini/config/plugins/modern-web-stack/skills/node-project-architecture/resources/$res"
     done
   fi
 

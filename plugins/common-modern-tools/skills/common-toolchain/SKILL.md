@@ -1,6 +1,6 @@
 ---
 name: common-toolchain
-description: Cross-platform modern CLI toolchain (rg, fd, ast-grep, tokei, bat, sd, jq, yq, duckdb, sqlite3, xsv, xh, dust, pdftotext, shfmt, actionlint, hyperfine, pwsh, Vite+), 4-tier tool selection hierarchy, token-saving protocols, custom CLI helpers, and authoritative live documentation matrix. Use when running terminal commands, inspecting documentation/PDFs, processing data, or managing cross-platform workflows.
+description: Cross-platform modern CLI toolchain (rg, fd, ast-grep, tokei, bat, sd, jq, yq, duckdb, sqlite3, xsv, xh, dust, pdftotext, shfmt, actionlint, hyperfine, pwsh, Vite+), 4-tier tool selection hierarchy, token-saving protocols, custom CLI helpers, two-stage webread protocol, and authoritative live documentation matrix. Use when running terminal commands, inspecting documentation/PDFs, processing data, or managing cross-platform workflows.
 compatibility: macOS Darwin, Windows 11, Linux, PowerShell 7+, Vite+
 ---
 
@@ -13,9 +13,9 @@ Always follow this prioritized 4-tier selection hierarchy instead of slow legacy
 ### Tier 1: Modern Standalone CLI Binaries (Zero Runtime Overhead)
 
 - **Codebase Reconnaissance**: `tokei .` (SLOC and language breakdown in < 100 tokens).
-- **Code Search**: `rg -n -M 200 "PATTERN" .` (always `-M 200` to prevent minified line blowup; pass `-l` for file paths only).
+- **Code Search**: `rg -n -M 200 "PATTERN" <path>` (always `-M 200` to prevent minified line blowup; pass `-l` for file paths only).
 - **Structural Analysis & Rewrites**: `ast-grep run -p "PATTERN" -l <lang> <file>` (or `sg`).
-- **File Finding**: `fd -e <ext>` or `fd -H "pattern" .` (use `-d <depth>` to prevent unbounded traversal).
+- **File Finding**: `fd -e <ext>` or `fd -H "pattern" <path>` (use `-d <depth>` to prevent unbounded traversal).
 - **Content Previews**: `bat --paging=never --style=plain -r <start>:<end> <file>`.
 - **PDF Extraction**: `pdftotext -f <start> -l <end> <file.pdf> -`.
 - **Tabular Data**: `xsv headers <file.csv>`, `xsv slice -i 1-5 <file.csv> | xsv table`, `duckdb -c "SELECT ... LIMIT 5;"`.
@@ -38,6 +38,7 @@ Always follow this prioritized 4-tier selection hierarchy instead of slow legacy
 
 - Manage dependencies via `vp`, run one-off tools via `vpx <tool>`, and execute scripts via `vpr <script>`. Strictly forbidden to use `npx`, `pnpm dlx`, `bunx`, or `npm run`.
 - Query web platform guidance via `vpx modern-web-guidance search / retrieve`.
+- Query active lint rules via `vp lint --rules` and `vp lint --print-config`.
 
 ### Tier 4: Heavy Compute & Domain Libraries (Python)
 
@@ -51,7 +52,7 @@ Execute code inspection along five progressive levels to conserve context:
 
 ```text
 [L0: Macro Recon]    tokei .                  -> Languages, file counts, code size (< 100 tokens)
-[L1: Scope Filter]   rg -l "query" .          -> Target file paths only (no matching lines)
+[L1: Scope Filter]   rg -l "query" <path>     -> Target file paths only (no matching lines)
 [L2: Syntax Outline] ast-grep run -p "..."    -> Function/class signatures only
 [L3: Window Preview] bat --style=plain -r N:M -> Read exact line window (< 100 lines)
 [L4: Verification]   <test> | Select -First 50 -> Terminal circuit breaker prevents log deluge
@@ -77,35 +78,36 @@ Treat local helper scripts as black boxes: always run `<command> --help` or `<co
 
 ---
 
-## 4. Authoritative Documentation & Fast Verification Matrix
+## 4. Two-Stage `webread` Protocol & Verification Matrix
 
-Always verify flags with `--help` or query canonical documentation before composing commands:
+Large documentation hubs exceed `webread`'s default `--max-chars` cap when fetched via `webread --llms <domain>` (which prefers `llms-full.txt`). Retrieve authoritative external docs in two stages:
 
-| Tool                 | Fast Local Verification                  | Canonical Documentation / Endpoint                                    |
-| :------------------- | :--------------------------------------- | :-------------------------------------------------------------------- |
-| `yt-dlp`             | `yt-dlp --help`                          | `webread https://github.com/yt-dlp/yt-dlp#usage-and-options`          |
-| `ffmpeg` / `ffprobe` | `ffmpeg -h full` / `ffprobe -h`          | `webread https://ffmpeg.org/ffmpeg.html`                              |
-| `gifski`             | `gifski --help`                          | `webread https://github.com/ImageOptim/gifski`                        |
-| `duckdb`             | `duckdb --help`                          | `webread --llms https://duckdb.org`                                   |
-| `sqlite3`            | `sqlite3 --help`                         | `https://www.sqlite.org/cli.html`                                     |
-| `xsv`                | `xsv --help`                             | `https://github.com/BurntSushi/xsv`                                   |
-| `ast-grep`           | `ast-grep --help` / `sg --help`          | `webread --llms https://ast-grep.github.io`                           |
-| `ripgrep`            | `rg --help`                              | `webread https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md`  |
-| `fd`                 | `fd --help`                              | `webread https://github.com/sharkdp/fd`                               |
-| `bat`                | `bat --help`                             | `webread https://github.com/sharkdp/bat`                              |
-| `tokei`              | `tokei --help`                           | `webread https://github.com/XAMPPRocky/tokei`                         |
-| `sd`                 | `sd --help`                              | `webread https://github.com/chmln/sd`                                 |
-| `jq`                 | `jq --help`                              | `webread https://jqlang.github.io/jq/manual/`                         |
-| `yq`                 | `yq --help`                              | `webread https://mikefarah.gitbook.io/yq/`                            |
-| `shfmt`              | `shfmt --help`                           | `webread https://github.com/mvdan/sh`                                 |
-| `pdftotext`          | `pdftotext -h`                           | `webread https://linux.die.net/man/1/pdftotext`                       |
-| `xh`                 | `xh --help`                              | `webread https://github.com/ducaale/xh`                               |
-| `hyperfine`          | `hyperfine --help`                       | `webread https://github.com/sharkdp/hyperfine`                        |
-| `actionlint`         | `actionlint -help`                       | `webread https://github.com/rhysd/actionlint/blob/main/docs/usage.md` |
-| `dust`               | `dust --help`                            | `webread https://github.com/bootandy/dust`                            |
-| `Vite+`              | `vp help` / `vp --help`                  | `webread --llms https://viteplus.dev`                                 |
-| `Oxc`                | `vpx oxlint --help` / `vpx oxfmt --help` | `webread --llms https://oxc.rs`                                       |
-| `PowerShell`         | `Get-Command <cmd> -Syntax`              | Refer to `modern-powershell` skill & `PSScriptAnalyzerSettings.psd1`  |
+1. **Stage 1 (Index)**: `webread https://<domain>/llms.txt` to discover the exact topic path or `.md` endpoint.
+2. **Stage 2 (Targeted Document)**: `webread https://<domain>/<exact-path>` (use `--llms` only on compact sites or pass `--max-chars <N>` when full text is explicitly needed).
+
+Always verify CLI flags with `--help` before querying external pages:
+
+| Tool                 | Fast Local Verification              | Verified Canonical Endpoint / Two-Stage Lookup                             |
+| :------------------- | :----------------------------------- | :------------------------------------------------------------------------- |
+| `Vite+`              | `vp --help` / `vp <cmd> --help`      | `webread https://viteplus.dev/llms.txt` → `/guide/<topic>.md`              |
+| `Oxc` (`oxlint/fmt`) | `vp lint --rules` / `vp lint --help` | `webread https://oxc.rs/llms.txt` → `/docs/guide/usage/linter/rules/...md` |
+| `Antigravity`        | —                                    | `webread https://antigravity.google/llms.txt` → `/docs/<topic>`            |
+| `duckdb`             | `duckdb --help`                      | `webread https://duckdb.org/llms.txt` → targeted doc page                  |
+| `ast-grep`           | `ast-grep --help` / `sg --help`      | `webread https://ast-grep.github.io/llms.txt` → targeted doc page          |
+| `yt-dlp`             | `yt-dlp --help`                      | `webread https://github.com/yt-dlp/yt-dlp#usage-and-options`               |
+| `ffmpeg` / `ffprobe` | `ffmpeg -h full` / `ffprobe -h`      | `webread https://ffmpeg.org/ffmpeg.html`                                   |
+| `gifski`             | `gifski --help`                      | `webread https://github.com/ImageOptim/gifski`                             |
+| `sqlite3`            | `sqlite3 --help`                     | `webread https://www.sqlite.org/cli.html`                                  |
+| `xsv`                | `xsv --help`                         | `webread https://github.com/BurntSushi/xsv`                                |
+| `ripgrep`            | `rg --help`                          | `webread https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md`       |
+| `fd`, `bat`, `tokei` | `<tool> --help`                      | `webread https://github.com/sharkdp/fd` / `bat` / `XAMPPRocky/tokei`       |
+| `sd`, `xh`, `dust`   | `<tool> --help`                      | `webread https://github.com/chmln/sd` / `ducaale/xh` / `bootandy/dust`     |
+| `jq`, `yq`           | `jq --help` / `yq --help`            | `webread https://jqlang.github.io/jq/manual/` / `mikefarah.gitbook.io/yq/` |
+| `shfmt`              | `shfmt --help`                       | `webread https://github.com/mvdan/sh`                                      |
+| `actionlint`         | `actionlint -help`                   | `webread https://github.com/rhysd/actionlint/blob/main/docs/usage.md`      |
+| `hyperfine`          | `hyperfine --help`                   | `webread https://github.com/sharkdp/hyperfine`                             |
+| `pdftotext`          | `pdftotext -h`                       | `webread https://linux.die.net/man/1/pdftotext`                            |
+| `PowerShell`         | `Get-Command <cmd> -Syntax`          | Refer to `modern-powershell` skill & `PSScriptAnalyzerSettings.psd1`       |
 
 ---
 
@@ -122,5 +124,5 @@ Always verify flags with `--help` or query canonical documentation before compos
 
 - **Path Composition**: Never concatenate paths with manual `/` or `\`. Use `node:path` (`path.join()`) in Node.js and `Join-Path` in PowerShell. Pass `-LiteralPath` to PowerShell file cmdlets.
 - **POSIX Globs**: Always enforce `/` in glob strings across all platforms (`pattern.replace(/\\/g, "/")`).
-- **Subshell Stdin Safety**: Always pass explicit target paths (`rg -n -M 200 "pattern" .`, `tokei .`, `sd "a" "b" file`). Never run commands that wait for stdin without arguments in background subshells.
-- **Line Endings & Encodings**: Commit all files with LF (`\n`) and UTF-8 without BOM. Normalize multiline comparisons with `str.replace(/\r\n/g, '\n')`.
+- **Subshell Stdin Safety**: Always pass explicit target paths (`rg -n -M 200 "pattern" <path>`, `tokei .`, `sd "a" "b" file`). Never run commands that wait for stdin without arguments in background subshells.
+- **Line Endings & Encodings**: Enforce LF (`\n`) and UTF-8 without BOM across files. Normalize multiline comparisons with `str.replace(/\r\n/g, '\n')`.

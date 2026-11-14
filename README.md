@@ -1,5 +1,23 @@
 # My Machine Build
 
+Cross-platform workstation bootstrap, PowerShell CLI utilities, dotfiles, and Antigravity plugins for macOS Darwin, Windows 11, and Windows 10 IoT LTSC.
+
+## Repository Overview
+
+- `cli/` (`clall.ps1`, `ebk.ps1`, `mdig.ps1`, `mkclp.ps1`, `mkgif.ps1`, `mmb.ps1`, `rea.ps1`, `ua.ps1`, `unodev.ps1`, `up.ps1`, `webread.ps1`): Cross-platform PowerShell 7 tools backed by `cli/helpers/CliCommon.psm1` and `cli/helpers/webread-parser.ts`.
+- `plugins/`: Antigravity plugins synced to `~/.gemini/config/plugins/` (`common-modern-tools`, `macos-modern-tools`, `windows-modern-tools`, `modern-web-stack`).
+- `scripts/install.sh`: Idempotent macOS Zsh installer for packages, dotfiles, CLI symlinks, and Antigravity plugins.
+- `scripts/install.ps1`: Dual-version Windows PowerShell 5.1 and PowerShell 7+ installer for WinGet packages, profiles, PATH registration, and Antigravity plugins.
+- `configs/`: Browser extension exports (`ubol-config.json`, `stylus.json`, `tampermonkey.json`, `immersive-translate-config.json`), global Git hooks, and shell configs.
+- `tests/`: Repository verification entry point (`tests/verify.ps1`), Pester tests (`tests/cli.Tests.ps1`), and Vitest suites (`tests/webread-parser.test.ts`, `tests/plugins.test.ts`).
+
+## Bootstrap and Verification Commands
+
+- macOS setup: `zsh scripts/install.sh`
+- Windows setup: `powershell -ExecutionPolicy Bypass -File scripts/install.ps1`
+- Full verification gate (PowerShell AST/formatting/PSScriptAnalyzer, shell syntax/shfmt, `vp check`, `tsc`, Vitest, Pester): `pwsh -NoLogo -NoProfile -File tests/verify.ps1`
+- Fast JavaScript/TypeScript verification: `vpr verify` or `vpr check:fast`
+
 ## Extension Configs
 
 - [UBoL Configs](https://github.com/Florencea/my-machine-build/raw/main/configs/ubol-config.json)
@@ -9,6 +27,8 @@
 
 ## Table of Contents
 
+- [Repository Overview](#repository-overview)
+- [Bootstrap and Verification Commands](#bootstrap-and-verification-commands)
 - [Extension Configs](#extension-configs)
 - [Browser & DevTools Note](#browser--devtools-note)
   - [Pagetual Rules](#pagetual-rules)

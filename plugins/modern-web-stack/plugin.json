@@ -1,4 +1,28 @@
 {
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "modern-web-stack",
-  "description": "Cross-platform modern web development bundle: Node.js (Active LTS), TypeScript 5+, React 19, Tailwind CSS v4, Google Chrome Modern Web Guidance, Hono, Drizzle ORM, TanStack Router, Vitest Browser testing, and GitHub Actions CI rules and skills."
+  "displayName": "Modern Web Stack",
+  "description": "Cross-platform modern web development bundle: Node.js (Active LTS), TypeScript, React, Tailwind CSS, Google Chrome Modern Web Guidance, Hono, Drizzle ORM, TanStack Router, Vitest Browser testing, Oxlint/Oxfmt, and GitHub Actions CI rules and skills.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Florencea",
+    "url": "https://github.com/Florencea"
+  },
+  "repository": "https://github.com/Florencea/my-machine-build",
+  "keywords": [
+    "viteplus",
+    "nodejs",
+    "typescript",
+    "react",
+    "tailwind",
+    "hono",
+    "drizzle",
+    "tanstack-router",
+    "oxlint"
+  ],
+  "suggestedPrompts": [
+    "Scaffold a Vite+ TypeScript workspace using node-project-architecture standards",
+    "Build a fail-closed Hono OpenAPI + Drizzle route backed by Zod validation",
+    "Audit this React + Tailwind codebase against Oxlint rules and modern-web-guidance"
+  ]
 }

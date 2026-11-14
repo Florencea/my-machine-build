@@ -5,6 +5,9 @@
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
+  "[css]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
   "[javascript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
@@ -15,6 +18,9 @@
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
   "[jsonc]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[markdown]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
   "[typescript]": {
@@ -32,7 +38,7 @@
   },
   "js/ts.experimental.useTsgo": true,
   "js/ts.preferences.preferTypeOnlyAutoImports": true,
-  "js/ts.tsdk.path": "./node_modules/typescript",
+  "js/ts.tsdk.path": "./node_modules/typescript/lib",
   "npm.scriptRunner": "vp",
   "oxc.disableNestedConfig": true,
   "oxc.fmt.disableNestedConfig": true,

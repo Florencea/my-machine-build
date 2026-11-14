@@ -23,7 +23,7 @@ In Antigravity's Windows execution environment, the host shell is **Windows Powe
   ```powershell
   pwsh -NoLogo -NoProfile -Command '$src = ''C:\path\to\dir''; Get-ChildItem -LiteralPath $src'
   ```
-- **Base64 `-EncodedCommand` (Recommended for Multi-Line Scripts)**:
+- **Base64 `-EncodedCommand` (Safe for Multi-Line Scripts)**:
   Bypass outer shell quote-stripping by encoding UTF-16LE bytes to Base64:
   ```powershell
   $script = @'

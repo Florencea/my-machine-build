@@ -1,26 +1,24 @@
 ---
 name: modern-powershell
-description: Strict cross-platform (macOS, Windows 11, Linux) and cross-version (PowerShell 7+ pwsh vs Windows PowerShell 5.1) authoring standards, pre-execution live documentation and runtime introspection gate, AST and PSUseCompatibleSyntax grammar verification, VS Code Stroustrup formatting (LF, UTF-8 without BOM), and non-bypassable PSScriptAnalyzer static analysis. Use when writing, refactoring, formatting, or debugging PowerShell scripts (.ps1, .psm1, .psd1) or in-memory pwsh automation.
+description: Strict cross-platform (macOS, Windows 11, Linux) and cross-version (PowerShell 7+ pwsh vs Windows PowerShell 5.1) authoring standards, pre-execution runtime introspection gate, AST and PSUseCompatibleSyntax grammar verification, VS Code Stroustrup formatting (LF, UTF-8 without BOM), and non-bypassable PSScriptAnalyzer static analysis. Use when writing, refactoring, formatting, or debugging PowerShell scripts (.ps1, .psm1, .psd1) or in-memory pwsh automation.
 compatibility: PowerShell 7+ (pwsh), Windows PowerShell 5.1 (powershell.exe), PSScriptAnalyzer, macOS Darwin, Windows 11, Linux
 ---
 
 # Modern PowerShell Authoring & Verification Guidelines
 
-**CRITICAL:** Every PowerShell script (`.ps1`, `.psm1`, `.psd1`) and multi-line automation block must pass three mandatory gates on the first attempt: (1) `Invoke-Formatter` with LF (`\n`) and UTF-8 without BOM normalization, (2) AST parser grammar check (`[System.Management.Automation.Language.Parser]::ParseFile`) plus `PSUseCompatibleSyntax` for dual-version scripts, and (3) `Invoke-ScriptAnalyzer -IncludeSuppressed -EnableExit` with **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
+**CRITICAL:** Every PowerShell script (`.ps1`, `.psm1`, `.psd1`) and multi-line automation block must pass three mandatory gates on the first attempt: (1) `Invoke-Formatter` with LF (`\n`) and UTF-8 without BOM normalization, (2) AST parser grammar check (`[System.Management.Automation.Language.Parser]::ParseFile`) plus `PSUseCompatibleSyntax` for dual-version scripts, and (3) `Invoke-ScriptAnalyzer -IncludeSuppressed` yielding **0 ParseErrors, 0 Errors, 0 Warnings, and 0 Information violations**.
 
 ---
 
-## 1. Runtime Introspection & Authoritative Endpoints
+## 1. Runtime Introspection First (SSOT Gate)
 
-Never guess cmdlet parameters or `.NET` overloads from pre-training memory:
+`learn.microsoft.com` pages return empty anti-bot shells in `webread`; always verify cmdlets, `.NET` signatures, and analyzer rules against the live PowerShell runtime first:
 
 - **Cmdlet Syntax**: `pwsh -NoLogo -NoProfile -Command "Get-Command <CmdletName> -Syntax"`
-- **.NET Method Overloads**: `pwsh -NoLogo -NoProfile -Command "[System.IO.File].GetMethods() | Where-Object Name -eq 'WriteAllText' | ForEach-Object { `$_.ToString() }"`
+- **Full Cmdlet Help**: `pwsh -NoLogo -NoProfile -Command "Get-Help <CmdletName> -Full"`
+- **.NET Method Overloads**: `pwsh -NoLogo -NoProfile -Command "[System.IO.File].GetMethods() | Where-Object Name -eq 'WriteAllText' | ForEach-Object { $_.ToString() }"`
 - **Analyzer Rule Introspection**: `pwsh -NoLogo -NoProfile -Command "Get-ScriptAnalyzerRule -Name <RuleName> | Format-List *"`
-- **Microsoft Learn Documentation**:
-  - PS 5.1 vs 7+ Breaking Differences: `webread https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell`
-  - Cross-Platform Portable Modules: `webread https://learn.microsoft.com/en-us/powershell/scripting/dev-cross-plat/writing-portable-modules`
-  - PSScriptAnalyzer Rules: `webread https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/using-scriptanalyzer`
+- **External Docs Fallback**: When upstream wording is required outside runtime help, fetch raw Markdown from `https://raw.githubusercontent.com/MicrosoftDocs/PowerShell-Docs/main/...` via `webread`.
 
 ---
 

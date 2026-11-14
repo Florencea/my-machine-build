@@ -1,57 +1,55 @@
 ---
 name: modern-nodejs
-description: Modern Node.js pure ESM standards, config pre-verification, Zod runtime validation, and zero-dependency built-in rules. Use when writing Node.js scripts, managing dependencies, configuring runtimes, or building CLI utilities.
-compatibility: Node.js (Active LTS), Vite+, Zod
+description: Modern Node.js pure ESM standards, two-stage external SSOT documentation and Oxlint anti-pattern gateways, Zod runtime validation, and zero-dependency built-in rules. Use when writing Node.js scripts, managing dependencies, configuring runtimes, or building CLI utilities.
+compatibility: Node.js (Active LTS), Vite+, Zod, Oxlint
 ---
 
 # Modern Node.js Guidelines
 
-## 1. Authoritative External Endpoints
+## 1. External SSOT & Anti-Pattern Gateways
 
-Query official documentation before authoring Node.js scripts or configurations:
+Verify live Node.js APIs, Vite+ options, and active linter anti-patterns before authoring scripts or configurations:
 
-- **Node.js Official API Reference**: `webread https://nodejs.org/api/`
-- **Vite+ Documentation**: `webread --llms https://viteplus.dev` (or `https://viteplus.dev/llms-full.txt`)
-- **Runtime Toolchain Inspection**: `vp toolchain` to inspect runtime version and active tools dynamically.
+- **Node.js Official API (Two-Stage `webread`)**:
+  - Stage 1 (Index): `webread https://nodejs.org/llms.txt`
+  - Stage 2 (Module Markdown): `webread https://nodejs.org/docs/latest/api/<module>.md` (e.g. `sqlite.md`, `util.md`, `test.md`, `fs.md`)
+- **Vite+ Reference**:
+  - Stage 1: `webread https://viteplus.dev/llms.txt` → Stage 2: `webread https://viteplus.dev/guide/<topic>.md` (plus `vp toolchain` and `vp --help`).
+- **Oxlint Node & ESM Anti-Patterns**:
+  - Inspect enabled rules locally: `vp lint --rules` (filter `unicorn`, `node`, `import`, `promise`, `oxc`) and `vp lint --print-config`.
+  - Retrieve exact anti-pattern rationale and examples: `webread https://oxc.rs/docs/guide/usage/linter/rules/<plugin>/<rule>.md` (e.g. `unicorn/prefer-node-protocol.md`, `unicorn/no-process-exit.md`, `node/no-path-concat.md`, `node/no-new-require.md`).
 
 ---
 
 ## 2. Zero-Dependency Native Selection Tree
 
-Prioritize Node.js built-ins over third-party dependencies:
+Prioritize Node.js built-ins over third-party dependencies, verifying exact exports in `nodejs.org/docs/latest/api/<module>.md` before use:
 
-- **CLI Argument Parsing**: Always use `node:util` `parseArgs({ options, allowPositionals })`.
-- **Terminal Styling**: Always use `node:util` `styleText('color', text)`.
-- **File System Globbing**: Always use `node:fs/promises` `glob(pattern)`.
-- **Embedded Database**: Always use native `node:sqlite` (`DatabaseSync`).
-- **Standard Web Globals**: Always use native `fetch`, `FormData`, `Request`, `Response`, `crypto.randomUUID()`, `structuredClone()`, `URL`.
-- **Unit Testing**: Always use native `node:test` and `node:assert/strict`.
-- **Environment Loading**: Always use native `process.loadEnvFile()`.
+- CLI argument parsing and terminal styling → `node:util`
+- File system globbing and async I/O → `node:fs/promises`
+- Embedded SQLite storage → `node:sqlite`
+- Standard Web Globals → `fetch`, `FormData`, `Request`, `Response`, `crypto.randomUUID()`, `structuredClone()`, `URL`
+- Unit testing and assertions → `node:test` and `node:assert/strict` (or `vite-plus/test`)
+- Environment loading → `process.loadEnvFile()`
 
 ---
 
 ## 3. Native Manifest Operations (`vp pm pkg`)
 
-Always manage `package.json` fields via native Vite+ manifest commands:
+Manage `package.json` exclusively through native Vite+ manifest commands:
 
 - Inspect: `vp pm pkg get <key>`
 - Mutate: `vp pm pkg set <key>=<value>` (pass `--json` for arrays/objects/booleans)
 - Remove: `vp pm pkg delete <key>`
-- Standardize & Normalize: `vp pm pkg fix`
+- Standardize & normalize: `vp pm pkg fix`
 
-STRICTLY FORBIDDEN to use raw regex replacement or `jq` file swapping (`package.json.tmp && mv`).
+STRICTLY FORBIDDEN to rewrite `package.json` with raw regex replacements or `jq` file swaps.
 
 ---
 
-## 4. Cross-Platform Portability & Process Safety
+## 4. Cross-Platform Portability & Process Safety Invariants
 
-- **Path Composition**:
-  - Always use `node:path` methods (`path.join()`, `path.resolve()`, `path.relative()`).
-  - Use `fileURLToPath(import.meta.url)` and `import.meta.dirname` in ESM.
-  - In all glob patterns, enforce POSIX forward slashes `/` (`pattern.replace(/\\/g, "/")`).
-- **Cross-Platform `package.json` Scripts**:
-  - Prohibit OS-specific builtins (`rm -rf`, `export VAR=val`, `set VAR=val`).
-  - Use cross-platform Node.js one-liners: `node -e "fs.rmSync('dist', { recursive: true, force: true })"`.
-- **Process Safety**:
-  - Always invoke child processes via `execFileSync` or `spawnSync` with an argument array and `{ shell: false }`. Avoid string-concatenated shell execution.
-  - Headless Stdin: Never prompt for standard input in automated scripts to prevent background subshell hangs.
+- **Pure ESM & `node:` Protocol**: Require `"type": "module"`, prohibit CommonJS (`require`, `module.exports`, `__dirname`), prefix all built-ins with `node:`, and resolve paths relative to `import.meta.dirname` or `fileURLToPath(import.meta.url)`.
+- **Path & Glob Composition**: Use `node:path` (`path.join()`, `path.resolve()`, `path.relative()`). Never concatenate paths with `+ '/' +`. Enforce POSIX `/` in glob strings (`pattern.replace(/\\/g, "/")`).
+- **Cross-Platform `package.json` Scripts**: Prohibit OS-specific shell builtins (`rm -rf`, `export`, `set`, `mkdir -p`); use Node.js one-liners (`node -e "fs.rmSync('dist', { recursive: true, force: true })"`).
+- **Process & Stdin Safety**: Invoke subprocesses via `execFileSync` or `spawnSync` with argument arrays and `{ shell: false }`. Prefer `process.exitCode = 1` over `process.exit(1)`. Never block waiting for stdin in non-interactive automation.

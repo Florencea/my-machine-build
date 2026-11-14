@@ -1,75 +1,43 @@
 ---
 name: modern-react-tailwind
-description: Strict best practices for modern React 19, official 'You Might Not Need an Effect' rules, and Tailwind CSS v4. Use when building React components, server actions, forms, hooks, layout structures, and styling with Tailwind CSS v4.
-compatibility: React 19.x, Tailwind CSS 4.x, Vite+
+description: Strict architectural invariants and live external SSOT lookup gateways for modern React, Effect discipline, Tailwind CSS, and component contracts. Use when building React components, actions, forms, hooks, layout structures, and Tailwind styling.
+compatibility: React, Tailwind CSS, Vite+, Oxlint
 ---
 
-# Modern React 19 & Tailwind CSS v4 Guidelines
+# Modern React & Tailwind CSS Guidelines
 
-## 1. Authoritative External Endpoints (Look Before Leaping)
+## 1. External SSOT Lookup Gateways (Required Before Coding)
 
-Before authoring components or styling, query live documentation:
+`react.dev` HTML routes return empty anti-bot pages in `webread`; always resolve React docs via `.md` endpoints from `llms.txt`:
 
-- **React 19 Official Reference**: `webread https://react.dev/reference/react`
-- **Official "You Might Not Need an Effect"**: `webread https://react.dev/learn/you-might-not-need-an-effect`
-- **Tailwind CSS v4 Documentation**: `webread https://tailwindcss.com/docs`
-- **Web Platform Standards & Modern Web Guidance (External SSOT)**: For all native HTML/CSS/DOM capabilities (`<dialog>`, `[popover]`, `anchor()`, View Transitions, Container Queries, `:user-invalid`, ARIA), execute `vpx modern-web-guidance search "<query>"` / `retrieve "<id>"`. This skill defines React 19 and Tailwind architecture only; all underlying web platform capabilities are strictly delegated to external MWG queries.
-
----
-
-## 2. Component Architecture & React 19 Paradigms
-
-- **Server vs Client Boundary**:
-  - Default all components to **React Server Components (RSC)**.
-  - Add `"use client"` only when requiring browser APIs, interactive state hooks (`useState`, `useReducer`), event handlers (`onClick`, `onChange`), or custom client hooks.
-- **Direct Ref Passing**:
-  - Pass `ref` directly as a regular prop: `function Input({ ref, ...props }: InputProps)`.
-  - Strictly prohibited to use `React.forwardRef`, `React.FC`, or `React.FunctionComponent`.
-- **Form Actions & Optimistic State**:
-  - Prefer native `<form action={serverAction}>` paired with `useActionState`, `useFormStatus`, and `useOptimistic`.
-  - Avoid legacy `onSubmit` handlers paired with `e.preventDefault()`.
-- **Async Resource Unwrapping**:
-  - Use `use(Promise)` or `use(Context)` to unwrap resources directly during render. Never use `useEffect` for initial data fetching.
+- **React Core & API Reference** (Two-Stage `.md`):
+  - Stage 1: `webread https://react.dev/llms.txt`
+  - Stage 2: `webread https://react.dev/<path>.md` (e.g. `https://react.dev/reference/react.md`, `https://react.dev/learn/you-might-not-need-an-effect.md`)
+- **React & Accessibility Oxlint Rules**:
+  - Inspect enabled rules: `vp lint --rules` (filter `react`, `react_perf`, `jsx_a11y`).
+  - Rule details & examples: `webread https://oxc.rs/docs/guide/usage/linter/rules/react/<rule>.md` (e.g. `set-state-in-effect.md`, `exhaustive-deps.md`, `forward-ref-uses-ref.md`).
+- **Tailwind CSS Documentation** (`/llms.txt` returns 404; HTML routes succeed directly):
+  - `webread https://tailwindcss.com/docs/theme` (or `/docs/<topic>`) + inspect local CSS `@theme` definitions.
+- **Web Platform Capabilities (Delegate Strictly to MWG)**:
+  - Before implementing `<dialog>`, `[popover]`, anchor positioning, View Transitions, Container Queries, `:user-invalid`, or ARIA behaviors, query `vpx modern-web-guidance search "<query>"` and `retrieve "<id>"`.
 
 ---
 
-## 3. Effect Discipline: The Synchronization Rule
+## 2. React Architectural Invariants
 
-Effects are an escape hatch strictly reserved for synchronizing with external systems (browser DOM APIs, third-party widgets, WebSockets, external stores).
-
-- **The Synchronization Test**:
-  - Is it synchronizing with an external system? $\rightarrow$ **Use an Effect**.
-  - Is it transforming data for rendering, handling user events, resetting state on prop change, or notifying parents? $\rightarrow$ **Do not use an Effect**.
-- **Official 12 Scenarios**:
-  - For concrete patterns covering derived state, expensive calculations, prop change resets, event sharing, POST requests, cascading chains, app initialization, parent notification, store subscriptions, and race-free data fetching, query the official reference:
-    `webread https://react.dev/learn/you-might-not-need-an-effect`
+- **Server vs Client Boundary**: Default components to React Server Components (RSC). Add `"use client"` strictly when browser APIs, interactive state hooks, or event handlers are needed.
+- **Direct `ref` Prop & Function Components**: Pass `ref` directly as a prop (`function Input({ ref, ...props }: InputProps)`). STRICTLY PROHIBITED: `React.forwardRef`, `React.FC`, `React.FunctionComponent`.
+- **Actions & Async Unwrapping**: Prefer form actions (`useActionState`, `useFormStatus`, `useOptimistic`) over manual `onSubmit` + `e.preventDefault()`, and `use(Promise)` / `use(Context)` over fetching inside `useEffect`.
+- **Effect Synchronization Discipline**: Effects are strictly for synchronizing with external systems (DOM widgets, WebSockets, external stores). Never use `useEffect` for derived state, expensive memoized calculations, prop-change resets, or user event chains; consult `https://react.dev/learn/you-might-not-need-an-effect.md` when in doubt.
 
 ---
 
-## 4. Tailwind CSS v4 & Design System Governance
+## 3. Tailwind CSS Design Tokens & `@shadcn/lint` Contracts
 
-### 4.1 Design Token Single Source of Truth (`@theme`)
-
-Define design tokens centrally in the root CSS file (`src/index.css`):
-
-```css
-@import "tailwindcss";
-
-@theme {
-  --color-primary: #3b82f6;
-  --color-brand-accent: #8b5cf6;
-  --font-display: "Inter", sans-serif;
-}
-```
-
-Bridge third-party component libraries (e.g. Ant Design tokens) directly to CSS variables defined in `@theme`.
-
-### 4.2 Component Contracts & Linting (`@shadcn/lint`)
-
-- **`shadcn/no-raw-colors`**: Strictly forbids hardcoding hex/rgb values or unmapped color utilities. All colors must derive from `@theme`.
-- **`shadcn/no-arbitrary-values`**: Bans arbitrary brackets (e.g. `w-[321px]`). Use standardized spacing scale tokens.
-- **`shadcn/no-inline-styles`**: Forbids `style={{ ... }}` attributes. Dynamic properties must bind CSS variables or variant props.
-- **`shadcn/no-restyle`**: External pages may only pass layout and positioning utilities (`allow: ["layout"]`, e.g. `w-full`, `mt-4`) or declared variant props; never restyle internal component borders or typography from outside.
-- **LSP Validation**:
-  - Verify class compatibility: `vpr lint:tailwind`
-  - Auto-sort and canonically format utility classes: `vpr lint:tailwind:fix`
+- **Design Token SSOT (`@theme`)**: Define CSS tokens centrally in root CSS (`@import "tailwindcss";` + `@theme { ... }`) and bind third-party UI library theme tokens to those CSS variables.
+- **Enforced Component Contracts**:
+  - `shadcn/no-raw-colors`: Forbid hardcoded hex/rgb values outside `@theme`.
+  - `shadcn/no-arbitrary-values`: Ban unmapped arbitrary brackets (e.g. `w-[321px]`).
+  - `shadcn/no-inline-styles`: Forbid `style={{ ... }}`; bind CSS variables or variants.
+  - `shadcn/no-restyle`: External callers may pass layout/positioning utilities (`allow: ["layout"]`) or declared variants only; never restyle internal typography or borders from outside.
+- **Verification**: Run `vpr lint:tailwind` to verify classes and `vpr lint:tailwind:fix` to sort utilities canonically.

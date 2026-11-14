@@ -24,7 +24,7 @@ export default defineConfig({
       suspicious: "error",
       perf: "error",
     },
-    plugins: ["unicorn", "typescript", "oxc", "vitest", "promise"],
+    plugins: ["unicorn", "typescript", "oxc", "vitest", "promise", "node", "import"],
   },
   fmt: {
     ignorePatterns: [

@@ -1,7 +1,7 @@
 ---
 name: macos-toolchain
 description: macOS Darwin platform execution rules, subshell stdin defense, Zsh glob nomatch guardrails, APFS Copy-on-Write cloning, BSD compatibility recipes, Apple system administration (defaults, scutil, PlistBuddy, launchservices), and PowerShell 7 symlink resolution. Use when running Darwin-specific workflows or configuring macOS system settings.
-compatibility: macOS Darwin, Zsh 5+, PowerShell 7+
+compatibility: macOS Darwin, Zsh, PowerShell 7+
 ---
 
 # macOS Darwin Toolchain & System Administration Guidelines

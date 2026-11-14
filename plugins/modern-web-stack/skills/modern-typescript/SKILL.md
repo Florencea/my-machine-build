@@ -1,50 +1,55 @@
 ---
 name: modern-typescript
-description: Strict TypeScript standards (TS 5+), pre-execution live verification, zero suppression directives, Zod runtime validation, and high-performance Oxlint + Oxfmt toolchain for agentic development. Use when writing, refactoring, or type-checking TypeScript code.
-compatibility: TypeScript 5+, Oxlint, Oxfmt, Vite+, Zod
+description: Strict TypeScript standards, Oxlint/Oxfmt anti-pattern and live verification gateways, zero suppression directives, and Zod runtime boundary validation. Use when writing, refactoring, or type-checking TypeScript code.
+compatibility: TypeScript (Current), Oxlint, Oxfmt, Vite+, Zod
 ---
 
 # Strict TypeScript Guidelines
 
-## 1. Authoritative External Endpoints & Verification Gate
+## 1. External SSOT & Anti-Pattern Gateways
 
-Inspect official references and query local type declarations before modifying code or configurations:
+Verify compiler flags, Zod APIs, and Oxlint rules before modifying TypeScript code or configs:
 
-- **TypeScript Reference**: `webread https://www.typescriptlang.org/docs/`
-- **Oxc Reference**: `webread --llms https://oxc.rs` (or `https://oxc.rs/llms.txt`)
-- **CLI Verification**: Run `vpx oxlint --help` (or `vp lint --help`) and `tsc -b --pretty false`.
+- **Oxlint Anti-Patterns & Rules SSOT** (query locally first, fetch Markdown on demand):
+  - List registered/active rules: `vp lint --rules` (filter `typescript`, `oxc`, `unicorn`, `promise`) and `vp lint --print-config`.
+  - Retrieve rule examples and rationale (`incorrect` / `correct`): Stage 1 `webread https://oxc.rs/llms.txt` → Stage 2 `webread https://oxc.rs/docs/guide/usage/linter/rules/<plugin>/<rule>.md`.
+  - CLI options: `vp lint --help` (or `vpx oxlint --help`).
+- **TypeScript Compiler & Declarations** (`typescriptlang.org` lacks `/llms.txt`):
+  - Local first: `tsc --help`, `tsc -b --pretty false`, and inspect `node_modules/typescript/lib/*.d.ts`.
+  - Handbook fallback: `webread https://www.typescriptlang.org/docs/handbook/<topic>.html`.
+- **Zod Schema API**:
+  - Stage 1 `webread https://zod.dev/llms.txt` → Stage 2 `webread https://zod.dev/api` (or inspect `node_modules/zod/**/*.d.ts` to verify current schema constructors vs deprecated methods).
 
 ---
 
-## 2. Zero Suppression & Non-Negotiable Type Invariants
+## 2. Zero Suppression & Structural Type Invariants
 
 - **Strict Ban on Suppression Directives**:
-  - STRICTLY PROHIBITED: `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, `/* oxlint-disable */`, `// biome-ignore`.
-  - Never downgrade rules in `tsconfig.json` or `.oxlintrc.json`. Resolve all type errors structurally.
+  - STRICTLY PROHIBITED: `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, `/* oxlint-disable */`, `// eslint-disable`, `// biome-ignore`.
+  - Never downgrade rules in `tsconfig.json` or `vite.config.ts`. Resolve errors structurally.
 - **Ban on Unsafe Casts & Assertions**:
-  - Never use double assertions (`as unknown as TargetType`) or raw casts without runtime proof. Narrow types via control flow (`typeof`, `instanceof`, `in`), discriminated unions, or Zod schemas.
-- **Strict Boolean Expressions**:
-  - Always evaluate explicit booleans (`if (str !== "")`, `if (arr.length > 0)`, `if (obj !== null)`).
-- **Single Map Lookups**:
-  - Perform a single `.get()` and check against `undefined`. Never invoke `map.has(key)` followed by `map.get(key)`.
+  - Prohibit double assertions (`as unknown as TargetType`) and unverified raw casts. Narrow via control flow (`typeof`, `instanceof`, `in`), discriminated unions, or Zod `safeParse`.
+- **Strict Boolean Expressions & Single Map Lookups**:
+  - Require explicit boolean comparisons (`str !== ""`, `arr.length > 0`, `obj !== null`).
+  - Lookup maps once: `const value = map.get(key); if (value !== undefined) { ... }` (never `has` + `get`).
 - **Type Modeling (`satisfies` vs `Record`)**:
-  - Static configurations & known objects $\rightarrow$ use `satisfies Type` to validate shape while preserving literal types.
-  - Dynamic dictionaries $\rightarrow$ use `: Record<K, V>` or `Map<K, V>` requiring explicit `undefined` checks.
-- **Template Literals**:
-  - Only interpolate primitives (`string`, `number`, `boolean`). Explicitly convert complex objects: `${String(val)}` or `${JSON.stringify(val)}`.
+  - Known static objects → `satisfies Type` to preserve literal inference.
+  - Dynamic dictionaries → `: Record<K, V>` or `Map<K, V>` with `undefined` checks.
+- **Template Literals & Native Execution Hygiene**:
+  - Interpolate only primitives (`string`, `number`, `boolean`); explicitly convert complex objects.
+  - Enforce `import type { ... }` (`verbatimModuleSyntax`), await or return all promises, prefer `??` over `||`, and write erasable syntax (`erasableSyntaxOnly`) compatible with direct Node.js execution.
 
 ---
 
 ## 3. Zod-First Runtime Boundary Validation
 
-Validate all external data (API responses, `JSON.parse`, configuration files, `process.env`) using Zod schemas:
+Validate all untrusted boundary data (API responses, `JSON.parse`, config files, `process.env`) via `safeParse` and infer static types via `z.infer<typeof Schema>` (verifying schema helpers against `zod.dev/api` or local `node_modules/zod` first):
 
 ```ts
 import { z } from "zod";
 
 export const UserSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
+  id: z.string().min(1),
   role: z.enum(["admin", "user"]).default("user"),
 });
 

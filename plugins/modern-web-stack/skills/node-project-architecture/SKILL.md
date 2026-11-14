@@ -6,7 +6,15 @@ compatibility: Node.js (Active LTS), Vite+, Antigravity
 
 # Node.js Project Architecture & Rules Splitting Guidelines
 
-This skill defines the canonical project structure, VSCode integration, CI workflows, and rules splitting standards for Node.js / Vite web applications operating in Google Antigravity.
+This skill defines the canonical project structure, VSCode integration, CI workflows, and rules splitting standards for Node.js / Vite+ web applications operating in Google Antigravity.
+
+## 0. Authoritative External SSOT Gateways
+
+Query live configuration docs and linter capabilities before scaffolding or refactoring project files:
+
+- **Vite+ Configuration & Task Cache**: Stage 1 `webread https://viteplus.dev/llms.txt` → Stage 2 `webread https://viteplus.dev/guide/<topic>.md` (plus `vp --help`).
+- **Oxlint Rules & Config**: Run `vp lint --rules` and `vp lint --print-config`; inspect `webread https://oxc.rs/llms.txt` → `https://oxc.rs/docs/guide/usage/linter/config.md`.
+- **Reusable CI Workflows**: Check current release tags in `https://github.com/Florencea/vp-actions` before pinning workflow references.
 
 ## 1. Modern Workspace Layout (Antigravity Standards)
 
@@ -41,7 +49,7 @@ Avoid monolithic, multi-thousand-line `AGENTS.md` files at the project root. Ins
 > [!NOTE]
 > **Global Plugins vs Local Rules Division**:
 >
-> - **Global Plugins** (`~/.gemini/config/plugins/`): Enforce machine-wide standards via common CLI tools (`common-modern-tools`), platform plugins (`macos-modern-tools` / `windows-modern-tools`), and the shared `modern-web-stack` plugin (strict TypeScript safety, modern Node.js runtime behavior, React 19 / Tailwind v4 standards, GitHub Actions CI `actionlint` verification, and Vitest testing standards).
+> - **Global Plugins** (`~/.gemini/config/plugins/`): Enforce machine-wide standards via common CLI tools (`common-modern-tools`), platform plugins (`macos-modern-tools` / `windows-modern-tools`), and the shared `modern-web-stack` plugin (strict TypeScript safety, modern Node.js runtime behavior, React / Tailwind CSS standards, GitHub Actions CI `actionlint` verification, and Vitest testing standards).
 > - **Local Rules** (`.agents/rules/`): Enforce project-unique domain concerns (e.g. database schema migrations, specific routing topologies, domain localization, chess/game engines).
 
 ---
