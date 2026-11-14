@@ -72,6 +72,11 @@ if ($gitStatus) {
 
 & git rev-parse --abbrev-ref '@{u}' >$null 2>&1
 if ($LASTEXITCODE -eq 0) {
+    & git fetch --tags --force --quiet
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine('Error: Failed to fetch remote tags.')
+        exit 1
+    }
     & git pull --ff-only --quiet
     if ($LASTEXITCODE -ne 0) {
         [Console]::Error.WriteLine('Error: Cannot fast-forward with remote. Please sync your branch first.')
@@ -156,18 +161,31 @@ function Invoke-Step {
 }
 
 function Restore-GitHubWorkflow {
-    # Prevent vp migrate and vp fmt from modifying CI workflows during dependency updates.
-    if (-not (Test-Path -LiteralPath '.github' -PathType Container)) {
+    # Prevent vp migrate and vp fmt from modifying CI workflows or action definitions during dependency updates.
+    param(
+        [switch]$IncludeActionsDir
+    )
+
+    $pathsToInspect = [System.Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath '.github' -PathType Container) {
+        $pathsToInspect.Add('.github')
+    }
+    if ($IncludeActionsDir -and (Test-Path -LiteralPath 'actions' -PathType Container)) {
+        $pathsToInspect.Add('actions')
+    }
+
+    if ($pathsToInspect.Count -eq 0) {
         return
     }
 
-    $diffLines = @(& git -c core.quotePath=false diff --relative --name-only -- '.github' 2>$null)
+    $diffLines = @(& git -c core.quotePath=false diff --relative --name-only -- @pathsToInspect 2>$null)
     if ($LASTEXITCODE -ne 0) {
         throw 'Failed to inspect GitHub Actions workflow changes after vp migrate'
     }
 
     $changedWorkflowFiles = @($diffLines | Where-Object {
-            $_ -imatch '^\.github/(workflows/[^/]+\.ya?ml|(.+/)?action\.ya?ml)$'
+            ($_ -imatch '^\.github/(workflows/[^/]+\.ya?ml|(.+/)?action\.ya?ml)$') -or
+            ($IncludeActionsDir -and ($_ -imatch '^actions/'))
         })
     if ($changedWorkflowFiles.Count -eq 0) {
         return
@@ -344,15 +362,16 @@ function Resolve-GitHubActionLatestVersion {
     }
 
     foreach ($res in $results) {
-        $latestVersion = $null
+        $latestByMajor = @{}
         if ($res.Success) {
             foreach ($tagName in $res.Tags) {
                 $parsed = ConvertFrom-GitHubActionVersion -Ref ([string]$tagName)
                 if ($null -eq $parsed) {
                     continue
                 }
-                if (($null -eq $latestVersion) -or ((Compare-GitHubActionVersion -Left $parsed -Right $latestVersion) -gt 0)) {
-                    $latestVersion = $parsed
+                $majorKey = [int]$parsed.Major
+                if ((-not $latestByMajor.ContainsKey($majorKey)) -or ((Compare-GitHubActionVersion -Left $parsed -Right $latestByMajor[$majorKey]) -gt 0)) {
+                    $latestByMajor[$majorKey] = $parsed
                 }
             }
         }
@@ -360,7 +379,7 @@ function Resolve-GitHubActionLatestVersion {
         $resultMap[$res.RepoSlug] = [PSCustomObject]@{
             RepoSlug      = $res.RepoSlug
             Success       = $res.Success
-            LatestVersion = $latestVersion
+            LatestByMajor = $latestByMajor
             Error         = $res.Error
         }
     }
@@ -371,18 +390,24 @@ function Resolve-GitHubActionLatestVersion {
 function Get-GitHubActionUpdate {
     param(
         [hashtable[]]$References = @(),
-        [hashtable]$LatestVersionByRepo = @{}
+        [hashtable]$LatestByMajorByRepo = @{}
     )
 
     $updates = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($refItem in $References) {
         $slug = [string]$refItem['RepoSlug']
-        if (-not $LatestVersionByRepo.ContainsKey($slug)) {
+        if (-not $LatestByMajorByRepo.ContainsKey($slug)) {
             continue
         }
 
-        $latestVersion = $LatestVersionByRepo[$slug]
+        $majorMap = $LatestByMajorByRepo[$slug]
         $currentVersion = $refItem['CurrentVersion']
+        $majorKey = [int]$currentVersion.Major
+        if (-not $majorMap.ContainsKey($majorKey)) {
+            continue
+        }
+
+        $latestVersion = $majorMap[$majorKey]
         $currentRef = [string]$refItem['CurrentRef']
         $targetRef = [string]$latestVersion.Raw
         $cmp = Compare-GitHubActionVersion -Left $latestVersion -Right $currentVersion
@@ -502,8 +527,9 @@ if ($ncuRaw -and $ncuRaw.Trim() -notin @('', '{}')) {
 
 $hasDepUpdates = ($isVitePlus -and $vpToolchainUpgraded) -or ($ncuMap.Count -gt 0)
 
-$ciFiles = @(Find-GitHubActionFile)
-$latestVersionByRepo = @{}
+$isGitHubActionsRepo = Test-Path -LiteralPath 'actions' -PathType Container
+$ciFiles = $isGitHubActionsRepo ? @() : @(Find-GitHubActionFile)
+$latestByMajorByRepo = @{}
 $ciUpdates = @()
 $ciDisplayEntries = [System.Collections.Generic.List[hashtable]]::new()
 $seenCiDisplayKeys = [System.Collections.Generic.HashSet[string]]::new()
@@ -519,12 +545,12 @@ if ($ciFiles.Count -gt 0) {
             if (-not $res.Success) {
                 [Console]::Error.WriteLine("Warning: Failed to query tags for ${slug}: $($res.Error)")
             }
-            elseif ($null -ne $res.LatestVersion) {
-                $latestVersionByRepo[$slug] = $res.LatestVersion
+            elseif ($res.LatestByMajor.Count -gt 0) {
+                $latestByMajorByRepo[$slug] = $res.LatestByMajor
             }
         }
 
-        $ciUpdates = @(Get-GitHubActionUpdate -References $ciRefs -LatestVersionByRepo $latestVersionByRepo)
+        $ciUpdates = @(Get-GitHubActionUpdate -References $ciRefs -LatestByMajorByRepo $latestByMajorByRepo)
         foreach ($updateItem in $ciUpdates) {
             $actionTarget = [string]$updateItem['ActionTarget']
             $currentRef = [string]$updateItem['OldRef']
@@ -594,7 +620,7 @@ try {
             Invoke-Step -Message 'Aligning Vite+ toolchain (vp migrate)' -Exe 'vp' -Arguments @('migrate', '--no-interactive')
 
             $failedStep = 'Restore GitHub Actions workflows'
-            Restore-GitHubWorkflow
+            Restore-GitHubWorkflow -IncludeActionsDir:$isGitHubActionsRepo
 
             if ($ncuMap.Count -gt 0) {
                 $failedStep = 'vpx npm-check-updates'
@@ -641,9 +667,9 @@ try {
         $failedStep = 'vp fmt'
         Invoke-Step -Message 'Formatting code & configs (vp fmt)' -Exe 'vp' -Arguments @('fmt')
 
-        if ($hasCiUpdates) {
+        if ($hasCiUpdates -or $isGitHubActionsRepo) {
             $failedStep = 'Restore GitHub Actions workflows before deps commit'
-            Restore-GitHubWorkflow
+            Restore-GitHubWorkflow -IncludeActionsDir:$isGitHubActionsRepo
         }
 
         $failedStep = 'vp check'
@@ -730,7 +756,7 @@ try {
 
         $failedStep = 'Update GitHub Actions versions'
         $freshCiRefs = @(Get-GitHubActionReference -FilePaths $ciFiles)
-        $updatesToApply = @(Get-GitHubActionUpdate -References $freshCiRefs -LatestVersionByRepo $latestVersionByRepo)
+        $updatesToApply = @(Get-GitHubActionUpdate -References $freshCiRefs -LatestByMajorByRepo $latestByMajorByRepo)
 
         $changedCiFiles = @(Update-GitHubActionFile -Updates $updatesToApply)
         if ($changedCiFiles.Count -gt 0) {
