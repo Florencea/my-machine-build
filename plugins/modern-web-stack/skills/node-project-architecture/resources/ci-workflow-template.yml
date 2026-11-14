@@ -19,11 +19,11 @@ permissions:
 jobs:
   ci:
     name: Gatekeeper
-    uses: Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v2.0.0
-    with:
-      # Optional: Command to run before tests (e.g. vp run db:seed for fullstack apps)
-      # pre-test-command: ""
-      # Optional: Custom build command (default: vp build)
-      # build-command: vp build
-      # Optional: Run platform compatibility checks on Windows and macOS
-      enable-platform-compat: false
+    uses: Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0
+    # with:
+    #   Optional: Command to run before tests (e.g. vp run db:seed for fullstack apps)
+    #   pre-test-command: ""
+    #   Optional: Custom build command (default: vp build)
+    #   build-command: vp build
+    #   Optional: Toggle E2E browser tests (default: true)
+    #   enable-e2e: true

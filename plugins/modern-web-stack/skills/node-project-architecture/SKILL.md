@@ -68,16 +68,18 @@ Standardize editor ergonomics to ensure seamless human-agent pair programming an
 Follow modern CI/CD governance to achieve deterministic verification and eliminate runner starvation:
 
 - **Centralized Workflows (`Florencea/vp-actions`)**:
-  - Standard Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v2.0.0`.
-  - Pass custom preparation hooks via `inputs.pre-test-command` (e.g. `vp run db:seed`) and optional matrix checks via `inputs.enable-platform-compat: true`.
-  - Specialized applications (desktop applications requiring virtual displays, custom platform packaging) consume modular Composite Actions:
-    - `Florencea/vp-actions/actions/setup-vp-env@v2.0.0`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
-    - `Florencea/vp-actions/actions/setup-playwright@v2.0.0`: Playwright browser cache, Chromium binary installation, and Linux system dependencies.
+  - Standard Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0` (`ubuntu-24.04`).
+  - Pass custom preparation hooks via `inputs.pre-test-command` (e.g. `vp run db:seed`).
+  - Electron desktop applications consume the centralized Electron Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-electron-ci.yml@v3.0.0`, which provides Linux gatekeeper checks plus `macos-26` and `windows-2025` packaging verification.
+  - Specialized applications with custom pipelines consume modular Composite Actions:
+    - `Florencea/vp-actions/actions/setup-vp-env@v3.0.0`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
+    - `Florencea/vp-actions/actions/setup-playwright@v3.0.0`: Chromium binary installation and Linux system dependencies.
 - **Exact SemVer Pinning Invariant**:
   - Always pin GitHub Actions and shared workflows to exact stable SemVer tags (`vX.Y.Z`) and upgrade them via `up`:
-    - `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v2.0.0`
-    - `Florencea/vp-actions/actions/setup-vp-env@v2.0.0`
-    - `Florencea/vp-actions/actions/setup-playwright@v2.0.0`
+    - `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0`
+    - `Florencea/vp-actions/.github/workflows/vp-electron-ci.yml@v3.0.0`
+    - `Florencea/vp-actions/actions/setup-vp-env@v3.0.0`
+    - `Florencea/vp-actions/actions/setup-playwright@v3.0.0`
     - `actions/checkout@v7.0.1`
     - `voidzero-dev/setup-vp@v1.22.0`
     - `actions/cache@v6.1.0`
