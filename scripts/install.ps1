@@ -87,7 +87,7 @@ if ((Get-ExecutionPolicy -Scope CurrentUser) -ne 'Unrestricted') {
 # Configure Windows PowerShell 5.1 machine-level registry key safely
 $ps51RegistryPath = 'HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell'
 if (Test-Path -LiteralPath $ps51RegistryPath) {
-    Set-ItemProperty -Path $ps51RegistryPath -Name 'ExecutionPolicy' -Value 'Unrestricted' -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -LiteralPath $ps51RegistryPath -Name 'ExecutionPolicy' -Value 'Unrestricted' -Force -ErrorAction SilentlyContinue
 }
 
 # Apply LocalMachine execution policy with graceful fallback for packaged PowerShell (MSIX / Store)
@@ -102,18 +102,18 @@ catch {
 }
 
 # Enable Windows OS LongPaths support
-Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord -Force
+Set-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord -Force
 
 # Enable App Sideloading and Developer Mode (required for Win10 LTSC Add-AppxPackage)
 $appUnlockPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
 if (-not (Test-Path -LiteralPath $appUnlockPath)) {
     New-Item -Path $appUnlockPath -Force | Out-Null
 }
-Set-ItemProperty -Path $appUnlockPath -Name 'AllowAllTrustedApps' -Value 1 -Type DWord -Force
-Set-ItemProperty -Path $appUnlockPath -Name 'AllowDevelopmentWithoutDevLicense' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+Set-ItemProperty -LiteralPath $appUnlockPath -Name 'AllowAllTrustedApps' -Value 1 -Type DWord -Force
+Set-ItemProperty -LiteralPath $appUnlockPath -Name 'AllowDevelopmentWithoutDevLicense' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
 
 # Workspace & VP_HOME directory resolution (Fallback to $HOME\_Workspace if E: is absent)
-if (Test-Path 'E:\') {
+if (Test-Path -LiteralPath 'E:\') {
     $workspaceDir = 'E:\_Workspace'
     $vpHome = 'E:\vite-plus'
 }
@@ -122,7 +122,10 @@ else {
     $vpHome = Join-Path $HOME '.vite-plus'
 }
 
-# Helper function to refresh PATH inside current process
+# ==============================================================================
+# Helper Functions (Windows PowerShell 5.1 & PowerShell 7+ Compatible)
+# ==============================================================================
+
 function Sync-SessionPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -148,7 +151,6 @@ function Sync-SessionPath {
     $env:Path = $combined -join ';'
 }
 
-# Helper function to download and save files securely
 function Save-FileSecure {
     param(
         [string]$Uri,
@@ -171,23 +173,6 @@ function Save-FileSecure {
         throw "Failed to download valid non-empty file from '$Uri' to '$OutFile'."
     }
 }
-
-Write-Output '=== Starting Windows Modern Dev Environment Setup ==='
-
-# 1. Workspace Directory Initialization
-if (-not (Test-Path -LiteralPath $workspaceDir)) {
-    Write-Output "[1/9] Creating Workspace Directory: $workspaceDir"
-    New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
-}
-else {
-    Write-Output "[1/9] Workspace Directory verified: $workspaceDir"
-}
-
-# 2. Internal Root CAs (Private PKI for *.internal)
-Write-Output '[2/9] Checking & Trusting Internal Root CAs...'
-
-$bhpdRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCRENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hRUkRFZU1Cd0dBMVVFQXd3VlFraFFSQ0JKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU1qRXdPVm9YRFRNMk1Ea3hOakUxTWpFd09Wb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJVUVReEhqQWNCZ05WQkFNTUZVSklVRVFnU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQk95elJsUngvMGR6SjBScDlkYTFiQmdCSmxMbFpqU0NmcFN6ZjBMcQpaeWRjeFo0c1NmWENuTyt4MUhZU1JEa3Y0RGlnYVZwckhaUE1OYldjQ1FsRnBsK2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZBZitMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQjhHQTFVZEl3UVlNQmFBRkFmKwpMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBjQU1FUUNJRmxqSXZKenIyWHJ5Y0FvYzgybVpjU2J3QzRPa1h3NExkQ3IKcU13SlpDWkRBaUJub2xGWjdLRUhtZWlUOU5xYUpmSEtSeW5rMzAwUDhSaDd1eDl2cWZIemNRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
-$bhgsRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCVENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hIVXpFZU1Cd0dBMVVFQXd3VlFraEhVeUJKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU5UUTBNbG9YRFRNMk1Ea3hOakUxTlRRME1sb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJUjFNeEhqQWNCZ05WQkFNTUZVSklSMU1nU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkZGOVk0d0N5TVNnbzNJSjU2QnZOaE12Mnh2a2Y4MC9id2dCOGhILwpFZHhzUktYTS91YjhBWTlldmxaR0VzQlpUZzJaS0ZIT0dMajBpNngyWldUanA3T2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZHMGU4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQjhHQTFVZEl3UVlNQmFBRkcwZQo4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBnQU1FVUNJUUNmd0JISXNaTVdHWUZEbVNFNHVuQlNlUUZidkZLMzU0NHUKQ1hadVYwRlhTd0lnR0hwRDVWMGN4RmluS2VtenJVMU1ZQklpZXB0SnVEVmFQSnVhK2Qya3JHST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
 
 function Install-InternalRootCA {
     param(
@@ -218,79 +203,6 @@ function Install-InternalRootCA {
     }
 }
 
-Install-InternalRootCA -Name 'BHPD Internal Root CA' -Base64Cert $bhpdRootCaB64
-Install-InternalRootCA -Name 'BHGS Internal Root CA' -Base64Cert $bhgsRootCaB64
-
-# 3. Vite+ Home & Cache Relocation
-if ([Environment]::GetEnvironmentVariable('VP_HOME', 'User') -ne $vpHome) {
-    Write-Output "[3/9] Setting VP_HOME to $vpHome..."
-    [Environment]::SetEnvironmentVariable('VP_HOME', $vpHome, 'User')
-    $env:VP_HOME = $vpHome
-}
-$env:VP_NODE_MANAGER = 'yes'
-$env:VP_PM_MANAGER = 'yes'
-if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
-    Write-Output '      Installing Vite+ toolchain...'
-    $vpBootstrapScript = Join-Path $env:TEMP "vp-install-$(Get-Random).ps1"
-    Save-FileSecure -Uri 'https://vite.plus/ps1' -OutFile $vpBootstrapScript
-    try {
-        & $vpBootstrapScript
-    }
-    finally {
-        Remove-Item -LiteralPath $vpBootstrapScript -Force -ErrorAction SilentlyContinue
-    }
-    Sync-SessionPath
-}
-else {
-    Write-Output '[3/9] Vite+ toolchain is ready.'
-}
-
-if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
-    & vp env default lts
-    & vp env install lts
-
-    $vpPkgJson = Join-Path $vpHome 'current\node_modules\vite-plus\package.json'
-    if (-not (Test-Path -LiteralPath $vpPkgJson -PathType Leaf)) {
-        $vpVerOut = @(& vp --version 2>$null)
-        foreach ($line in $vpVerOut) {
-            if ([string]$line -match '^vp v([^\s]+)') {
-                $verPkgJson = Join-Path $vpHome "$($Matches[1])\node_modules\vite-plus\package.json"
-                if (Test-Path -LiteralPath $verPkgJson -PathType Leaf) {
-                    $vpPkgJson = $verPkgJson
-                }
-                break
-            }
-        }
-    }
-
-    if (Test-Path -LiteralPath $vpPkgJson -PathType Leaf) {
-        $vpPkg = Get-Content -LiteralPath $vpPkgJson -Raw | ConvertFrom-Json
-        if ($null -ne $vpPkg.dependencies -and $null -ne $vpPkg.dependencies.PSObject.Properties['oxfmt']) {
-            $targetOxfmtVer = ([string]$vpPkg.dependencies.oxfmt).Trim() -replace '^[^0-9]*', ''
-            if ($targetOxfmtVer) {
-                $vpOxfmtShim = Join-Path $vpHome 'bin\oxfmt.exe'
-                $currentOxfmtVer = ''
-                if (Test-Path -LiteralPath $vpOxfmtShim -PathType Leaf) {
-                    $oxfmtVerOut = @(& $vpOxfmtShim --version 2>$null)
-                    foreach ($line in $oxfmtVerOut) {
-                        if ([string]$line -match '(\d+\.\d+\.\d+(?:-[^\s]+)?)') {
-                            $currentOxfmtVer = $Matches[1]
-                            break
-                        }
-                    }
-                }
-
-                if ((-not (Test-Path -LiteralPath $vpOxfmtShim -PathType Leaf)) -or ($currentOxfmtVer -ne $targetOxfmtVer)) {
-                    Write-Output "      Aligning global oxfmt to $targetOxfmtVer..."
-                    & vp install -g "oxfmt@$targetOxfmtVer"
-                    Sync-SessionPath
-                }
-            }
-        }
-    }
-}
-
-# 4. WinGet Bootstrap & Package Installation
 function Get-AppxPackageCompat {
     param(
         [string]$Name,
@@ -431,7 +343,6 @@ function Initialize-Winget {
         }
 
         # Modern WinGet (v1.28+) depends on VCLibs and Microsoft.WindowsAppRuntime.1.8.
-        # These dependencies are packaged together in DesktopAppInstaller_Dependencies.zip from GitHub releases.
         $depsUrl = 'https://github.com/microsoft/winget-cli/releases/latest/download/DesktopAppInstaller_Dependencies.zip'
         $wingetUrl = 'https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
 
@@ -459,7 +370,6 @@ function Initialize-Winget {
         Write-Output '      Downloading WinGet DesktopAppInstaller package...'
         Save-FileSecure -Uri $wingetUrl -OutFile $wingetPath
 
-        # Locate matching architecture dependencies (e.g. x64/ or arm64/)
         $targetArchDir = Join-Path $depsExtractDir $arch
         $depFiles = @()
         if (Test-Path -LiteralPath $targetArchDir) {
@@ -551,8 +461,6 @@ function Initialize-Winget {
     }
 }
 
-Initialize-Winget
-
 function Initialize-MicrosoftStore {
     $existing = Get-AppxPackageCompat -Name 'Microsoft.WindowsStore' -AllUsers
     if ($existing) {
@@ -586,8 +494,6 @@ function Initialize-MicrosoftStore {
     }
 }
 
-Initialize-MicrosoftStore
-
 function Install-WingetIdempotent {
     param([string]$Id, [string]$Name)
     if ($Id -eq 'AgileBits.1Password') {
@@ -606,6 +512,103 @@ function Install-WingetIdempotent {
         & winget install --id $Id -e --accept-package-agreements --accept-source-agreements --disable-interactivity
     }
 }
+
+# ==============================================================================
+# Provisioning Steps (1-9)
+# ==============================================================================
+
+Write-Output '=== Starting Windows Modern Dev Environment Setup ==='
+
+# 1. Workspace Directory Initialization
+if (-not (Test-Path -LiteralPath $workspaceDir)) {
+    Write-Output "[1/9] Creating Workspace Directory: $workspaceDir"
+    New-Item -ItemType Directory -Force -Path $workspaceDir | Out-Null
+}
+else {
+    Write-Output "[1/9] Workspace Directory verified: $workspaceDir"
+}
+
+# 2. Internal Root CAs (Private PKI for *.internal)
+Write-Output '[2/9] Checking & Trusting Internal Root CAs...'
+
+$bhpdRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCRENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hRUkRFZU1Cd0dBMVVFQXd3VlFraFFSQ0JKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU1qRXdPVm9YRFRNMk1Ea3hOakUxTWpFd09Wb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJVUVReEhqQWNCZ05WQkFNTUZVSklVRVFnU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQk95elJsUngvMGR6SjBScDlkYTFiQmdCSmxMbFpqU0NmcFN6ZjBMcQpaeWRjeFo0c1NmWENuTyt4MUhZU1JEa3Y0RGlnYVZwckhaUE1OYldjQ1FsRnBsK2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZBZitMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQjhHQTFVZEl3UVlNQmFBRkFmKwpMVWdDeTNKKzEwMEcwdUJHQ1JVWVMvQnRNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBjQU1FUUNJRmxqSXZKenIyWHJ5Y0FvYzgybVpjU2J3QzRPa1h3NExkQ3IKcU13SlpDWkRBaUJub2xGWjdLRUhtZWlUOU5xYUpmSEtSeW5rMzAwUDhSaDd1eDl2cWZIemNRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
+$bhgsRootCaB64 = 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNCVENDQWF1Z0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQThNUXN3Q1FZRFZRUUdFd0pVVnpFTk1Bc0cKQTFVRUNnd0VRa2hIVXpFZU1Cd0dBMVVFQXd3VlFraEhVeUJKYm5SbGNtNWhiQ0JTYjI5MElFTkJNQjRYRFRJMgpNRGt4T1RFMU5UUTBNbG9YRFRNMk1Ea3hOakUxTlRRME1sb3dQREVMTUFrR0ExVUVCaE1DVkZjeERUQUxCZ05WCkJBb01CRUpJUjFNeEhqQWNCZ05WQkFNTUZVSklSMU1nU1c1MFpYSnVZV3dnVW05dmRDQkRRVEJaTUJNR0J5cUcKU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkZGOVk0d0N5TVNnbzNJSjU2QnZOaE12Mnh2a2Y4MC9id2dCOGhILwpFZHhzUktYTS91YjhBWTlldmxaR0VzQlpUZzJaS0ZIT0dMajBpNngyWldUanA3T2pnWjB3Z1pvd053WUpZSVpJCkFZYjRRZ0VOQkNvV0tFOVFUbk5sYm5ObElFZGxibVZ5WVhSbFpDQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnAKZEhrd0hRWURWUjBPQkJZRUZHMGU4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQjhHQTFVZEl3UVlNQmFBRkcwZQo4VXdmZERWTlJ1N3RodXh1TmhmRVk0RG1NQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdEZ1lEVlIwUEFRSC9CQVFECkFnR0dNQW9HQ0NxR1NNNDlCQU1DQTBnQU1FVUNJUUNmd0JISXNaTVdHWUZEbVNFNHVuQlNlUUZidkZLMzU0NHUKQ1hadVYwRlhTd0lnR0hwRDVWMGN4RmluS2VtenJVMU1ZQklpZXB0SnVEVmFQSnVhK2Qya3JHST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo='
+
+Install-InternalRootCA -Name 'BHPD Internal Root CA' -Base64Cert $bhpdRootCaB64
+Install-InternalRootCA -Name 'BHGS Internal Root CA' -Base64Cert $bhgsRootCaB64
+
+# 3. Vite+ Home & Cache Relocation
+if ([Environment]::GetEnvironmentVariable('VP_HOME', 'User') -ne $vpHome) {
+    Write-Output "[3/9] Setting VP_HOME to $vpHome..."
+    [Environment]::SetEnvironmentVariable('VP_HOME', $vpHome, 'User')
+    $env:VP_HOME = $vpHome
+}
+$env:VP_NODE_MANAGER = 'yes'
+$env:VP_PM_MANAGER = 'yes'
+if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
+    Write-Output '      Installing Vite+ toolchain...'
+    $vpBootstrapScript = Join-Path $env:TEMP "vp-install-$(Get-Random).ps1"
+    Save-FileSecure -Uri 'https://vite.plus/ps1' -OutFile $vpBootstrapScript
+    try {
+        & $vpBootstrapScript
+    }
+    finally {
+        Remove-Item -LiteralPath $vpBootstrapScript -Force -ErrorAction SilentlyContinue
+    }
+    Sync-SessionPath
+}
+else {
+    Write-Output '[3/9] Vite+ toolchain is ready.'
+}
+
+if (Get-Command 'vp' -ErrorAction SilentlyContinue) {
+    & vp env default lts
+    & vp env install lts
+
+    $vpPkgJson = Join-Path $vpHome 'current\node_modules\vite-plus\package.json'
+    if (-not (Test-Path -LiteralPath $vpPkgJson -PathType Leaf)) {
+        $vpVerOut = @(& vp --version 2>$null)
+        foreach ($line in $vpVerOut) {
+            if ([string]$line -match '^vp v([^\s]+)') {
+                $verPkgJson = Join-Path $vpHome "$($Matches[1])\node_modules\vite-plus\package.json"
+                if (Test-Path -LiteralPath $verPkgJson -PathType Leaf) {
+                    $vpPkgJson = $verPkgJson
+                }
+                break
+            }
+        }
+    }
+
+    if (Test-Path -LiteralPath $vpPkgJson -PathType Leaf) {
+        $vpPkg = Get-Content -LiteralPath $vpPkgJson -Raw | ConvertFrom-Json
+        if ($null -ne $vpPkg.dependencies -and $null -ne $vpPkg.dependencies.PSObject.Properties['oxfmt']) {
+            $targetOxfmtVer = ([string]$vpPkg.dependencies.oxfmt).Trim() -replace '^[^0-9]*', ''
+            if ($targetOxfmtVer) {
+                $vpOxfmtShim = Join-Path $vpHome 'bin\oxfmt.exe'
+                $currentOxfmtVer = ''
+                if (Test-Path -LiteralPath $vpOxfmtShim -PathType Leaf) {
+                    $oxfmtVerOut = @(& $vpOxfmtShim --version 2>$null)
+                    foreach ($line in $oxfmtVerOut) {
+                        if ([string]$line -match '(\d+\.\d+\.\d+(?:-[^\s]+)?)') {
+                            $currentOxfmtVer = $Matches[1]
+                            break
+                        }
+                    }
+                }
+
+                if ((-not (Test-Path -LiteralPath $vpOxfmtShim -PathType Leaf)) -or ($currentOxfmtVer -ne $targetOxfmtVer)) {
+                    Write-Output "      Aligning global oxfmt to $targetOxfmtVer..."
+                    & vp install -g "oxfmt@$targetOxfmtVer"
+                    Sync-SessionPath
+                }
+            }
+        }
+    }
+}
+
+# 4. WinGet Bootstrap & Package Installation
+Initialize-Winget
+Initialize-MicrosoftStore
 
 Write-Output '[4/9] Checking & Installing Modern CLI Tools and Desktop Apps...'
 
@@ -651,12 +654,14 @@ foreach ($pkg in $desktopPackages) {
 
 & winget pin add --id Microsoft.Edge --blocking 2>$null | Out-Null
 
-# Refresh in-process PATH so git, pwsh, code etc. are immediately visible
 Sync-SessionPath
 
 # 5. Global Git Configuration & Pre-Commit Safety Hook
 Write-Output '[5/9] Configuring Global Git Settings & Pre-Commit Hook...'
 $scriptDir = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptDir) -and (-not [string]::IsNullOrWhiteSpace($currentScript))) {
+    $scriptDir = Split-Path -Parent $currentScript
+}
 $repoRoot = Split-Path -Parent $scriptDir
 
 & git config --global user.name 'Florencea'
@@ -696,7 +701,7 @@ else {
 & git config --global alias.br 'branch'
 & git config --global alias.ci 'commit'
 & git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-$gitRemoteBase = if (Test-Path 'D:\') {
+$gitRemoteBase = if (Test-Path -LiteralPath 'D:\') {
     'D:/Data/_GitRemote'
 }
 else {
@@ -753,6 +758,7 @@ if (-not (Test-Path -LiteralPath $codeUserDir)) {
 }
 $codeSettings = Join-Path $codeUserDir 'settings.json'
 if (Test-Path -LiteralPath $codeSettings) {
+    # Insert property textually because VS Code settings.json allows JSONC comments and trailing commas unsupported by PS 5.1 ConvertFrom-Json.
     $content = Get-Content -LiteralPath $codeSettings -Raw
     if ($content -notmatch '"terminal\.integrated\.defaultProfile\.windows"') {
         $idx = $content.LastIndexOf('}')
@@ -818,9 +824,8 @@ foreach ($pDir in $profileDirs) {
     }
 }
 
-# Ensure PSScriptAnalyzer is installed for PowerShell static analysis
+# Ensure PSScriptAnalyzer is installed for PowerShell static analysis.
 # In Windows PowerShell 5.1, PowerShellGet requires NuGet provider (>= 2.8.5.201) to interact with PSGallery.
-# Bootstrapping NuGet provider silently with -Force prevents the interactive prompt.
 if ($PSVersionTable.PSEdition -ne 'Core') {
     $hasNuGet = @(Get-PackageProvider -ListAvailable | Where-Object { $_.Name -eq 'NuGet' -and [Version]$_.Version -ge [Version]'2.8.5.201' })
     if ($hasNuGet.Count -eq 0) {
@@ -828,7 +833,7 @@ if ($PSVersionTable.PSEdition -ne 'Core') {
             Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser -ErrorAction Stop | Out-Null
         }
         catch {
-            Write-Output "Warning: Failed to bootstrap NuGet package provider: $($_.Exception.Message)"
+            Write-Warning "Failed to bootstrap NuGet package provider: $($_.Exception.Message)"
         }
     }
 }
@@ -838,7 +843,7 @@ if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
         Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
     }
     catch {
-        Write-Output "Warning: Failed to install PSScriptAnalyzer: $($_.Exception.Message)"
+        Write-Warning "Failed to install PSScriptAnalyzer: $($_.Exception.Message)"
     }
 }
 
@@ -848,7 +853,7 @@ if ($PSVersionTable.PSEdition -ne 'Core' -and (Get-Command pwsh -ErrorAction Sil
         pwsh -NoLogo -NoProfile -Command 'if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck }'
     }
     catch {
-        Write-Output "Warning: Failed to install PSScriptAnalyzer for PowerShell 7: $($_.Exception.Message)"
+        Write-Warning "Failed to install PSScriptAnalyzer for PowerShell 7: $($_.Exception.Message)"
     }
 }
 

@@ -14,6 +14,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @"
 mkclp: Clip Maker (Supports --quality [value], --copy, --browser, local files and YouTube videos)
@@ -48,7 +62,13 @@ for ($i = 0; $i -lt $args.Count; $i++) {
             [Console]::Error.WriteLine('Error: --quality requires a value')
             exit 1
         }
-        $Quality = [int]$args[++$i]
+        try {
+            $Quality = ConvertTo-ValidatedInt -Value ([string]$args[++$i]) -OptionName '--quality' -MinValue 0 -MaxValue 100
+        }
+        catch [System.ArgumentException] {
+            [Console]::Error.WriteLine("Error: $($_.Exception.Message)")
+            exit 1
+        }
     }
     elseif ($arg -match '^--?c(opy)?$') {
         $Copy = $true
@@ -66,6 +86,11 @@ for ($i = 0; $i -lt $args.Count; $i++) {
             exit 1
         }
         $Output = [string]$args[++$i]
+    }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
     }
     else {
         $positionals.Add($arg)
@@ -86,92 +111,56 @@ if ($positionals.Count -lt 3) {
     exit 1
 }
 
+if ($positionals.Count -gt 3) {
+    [Console]::Error.WriteLine("Error: Unexpected argument $($positionals[3])")
+    Show-Help
+    exit 1
+}
+
 $InputFile = $positionals[0]
 $Start = $positionals[1]
 $Duration = $positionals[2]
+
+try {
+    $startSec = Convert-TimeToSecond -TimeText $Start
+    $durSec = Convert-TimeToSecond -TimeText $Duration -PositiveOnly
+}
+catch [System.ArgumentException] {
+    [Console]::Error.WriteLine("Error: $($_.Exception.Message)")
+    exit 1
+}
+
 $qualityExplicitlySet = ($null -ne $Quality)
 $effectiveQuality = $qualityExplicitlySet ? [int]$Quality : ($IsMacOS ? 50 : 23)
 
-if ($IsWindows -and (-not (Get-Command 'ffmpeg' -ErrorAction SilentlyContinue) -or -not (Get-Command 'yt-dlp' -ErrorAction SilentlyContinue))) {
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    $env:PATH = "$userPath;$machinePath;$env:PATH"
-}
+Import-WindowsMachinePath
 
-foreach ($cmd in @('ffmpeg', 'ffprobe')) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine("Error: $cmd is not installed")
-        exit 1
-    }
-}
-
-function Convert-TimeToSecond {
-    param([string]$TimeStr)
-    if ($TimeStr -match '^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)$') {
-        return [double]$Matches[1] * 3600 + [double]$Matches[2] * 60 + [double]$Matches[3]
-    }
-    elseif ($TimeStr -match '^(\d+):(\d{2}(?:\.\d+)?)$') {
-        return [double]$Matches[1] * 60 + [double]$Matches[2]
-    }
-    $parsed = 0.0
-    if ([double]::TryParse($TimeStr, [ref]$parsed)) {
-        return $parsed
-    }
-    [Console]::Error.WriteLine("Error: Invalid time value '$TimeStr' (expected HH:MM:SS, MM:SS, or seconds).")
+if (-not (Test-RequiredCommand -Name 'ffmpeg', 'ffprobe')) {
     exit 1
 }
 
 $isLocal = Test-Path -LiteralPath $InputFile -PathType Leaf
 $inputSource = $InputFile
 $ffmpegStart = $Start
-$tempBase = $null
+$tempSegment = $null
 
 try {
     if (-not $isLocal) {
-        if (-not (Get-Command 'yt-dlp' -ErrorAction SilentlyContinue)) {
-            [Console]::Error.WriteLine("Error: File $InputFile does not exist and yt-dlp is not installed")
+        if (-not (Test-RequiredCommand -Name 'yt-dlp')) {
+            [Console]::Error.WriteLine("Error: File $InputFile does not exist and yt-dlp is required")
             exit 1
         }
 
-        $startSec = Convert-TimeToSecond -TimeStr $Start
-        $durSec = Convert-TimeToSecond -TimeStr $Duration
         $endSec = $startSec + $durSec
-        $targetBrowser = $Browser ? $Browser : ($env:YT_DLP_BROWSER ? $env:YT_DLP_BROWSER : 'edge')
-
-        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ('yt_clip_' + [System.Guid]::NewGuid().ToString('N'))
         $ytFormat = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'
-
-        # Try with browser cookies first (default: edge), then fallback without cookies
-        & yt-dlp --quiet --no-warnings `
-            --cookies-from-browser $targetBrowser `
-            --force-overwrites `
-            --no-playlist `
-            --download-sections "*${startSec}-${endSec}" `
-            --force-keyframes-at-cuts `
-            -f $ytFormat `
-            -o "$tempBase.%(ext)s" `
-            "$InputFile" 2>$null
-
-        $downloadedFile = (Get-ChildItem -Path "$tempBase.*" -ErrorAction SilentlyContinue | Select-Object -First 1)?.FullName
-        if (-not $downloadedFile) {
-            & yt-dlp --quiet --no-warnings `
-                --force-overwrites `
-                --no-playlist `
-                --download-sections "*${startSec}-${endSec}" `
-                --force-keyframes-at-cuts `
-                -f $ytFormat `
-                -o "$tempBase.%(ext)s" `
-                "$InputFile"
-
-            $downloadedFile = (Get-ChildItem -Path "$tempBase.*" -ErrorAction SilentlyContinue | Select-Object -First 1)?.FullName
-        }
-
-        if (-not $downloadedFile) {
-            [Console]::Error.WriteLine("Error: Failed to download YouTube video segment for input: $InputFile")
-            exit 1
-        }
-
-        $inputSource = $downloadedFile
+        $tempSegment = Invoke-YtDlpSegment `
+            -InputSource $InputFile `
+            -StartSecond $startSec `
+            -EndSecond $endSec `
+            -Format $ytFormat `
+            -Browser $Browser `
+            -ForceKeyframesAtCuts
+        $inputSource = $tempSegment.FilePath
         $ffmpegStart = '0'
     }
 
@@ -179,10 +168,20 @@ try {
     $mapArgs = @('-map', '0:v:0', '-map', '0:a?')
     $vcArgs = @()
 
-    $format = [string](& ffprobe -v error -show_entries format=format_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
-    $codec = [string](& ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "$inputSource" 2>$null)
+    $probeFormat = ''
+    $probeCodec = ''
+    $probeRaw = (& ffprobe -v error -select_streams v:0 -show_entries stream=codec_name:format=format_name -of json $inputSource 2>$null) -join "`n"
+    if ($LASTEXITCODE -eq 0 -and (-not [string]::IsNullOrWhiteSpace($probeRaw))) {
+        $probeObj = $probeRaw | ConvertFrom-Json
+        if ($null -ne $probeObj.format -and $null -ne $probeObj.format.format_name) {
+            $probeFormat = [string]$probeObj.format.format_name
+        }
+        if ($null -ne $probeObj.streams -and @($probeObj.streams).Count -gt 0) {
+            $probeCodec = ([string]$probeObj.streams[0].codec_name).Trim()
+        }
+    }
 
-    if ($Copy -or ($isLocal -and ($format -match 'mp4') -and ($codec.Trim() -in @('h264', 'hevc')) -and (-not $qualityExplicitlySet))) {
+    if ($Copy -or ($isLocal -and ($probeFormat -match 'mp4') -and ($probeCodec -in @('h264', 'hevc')) -and (-not $qualityExplicitlySet))) {
         $vcArgs = @('-c:v', 'copy', '-c:a', 'copy')
     }
     elseif ($IsMacOS) {
@@ -217,7 +216,7 @@ try {
         @vcArgs `
         -map_chapters -1 `
         -movflags +faststart `
-        "$outputFile"
+        $outputFile
 
     if ($LASTEXITCODE -ne 0) {
         [Console]::Error.WriteLine("Error: ffmpeg failed with exit code $LASTEXITCODE")
@@ -226,12 +225,12 @@ try {
 
     if (Test-Path -LiteralPath $outputFile -PathType Leaf) {
         $size = (Get-Item -LiteralPath $outputFile).Length
-        $readableSize = ($size -ge 1MB) ? ('{0:N1}M' -f ($size / 1MB)) : ('{0:N0}K' -f ($size / 1KB))
+        $readableSize = Format-ByteSize -ByteCount $size
         Write-Output "$outputFile $readableSize"
     }
 }
 finally {
-    if ($tempBase) {
-        Remove-Item -Path "$tempBase.*" -Force -ErrorAction SilentlyContinue
+    if ($null -ne $tempSegment -and (Test-Path -LiteralPath $tempSegment.TempDir)) {
+        Remove-Item -LiteralPath $tempSegment.TempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

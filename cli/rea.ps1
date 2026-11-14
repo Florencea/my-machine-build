@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 rea: ASS-Combiner: combine .cht.ass into original mkv as default subtitle track
@@ -26,8 +40,18 @@ foreach ($rawArg in $args) {
     if ($arg -match '^--?h(elp)?$') {
         $Help = $true
     }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
+    }
     elseif (-not $InputDir) {
         $InputDir = $arg
+    }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
     }
 }
 
@@ -43,8 +67,7 @@ if (-not $InputDir) {
     exit 1
 }
 
-if (-not (Get-Command 'ffmpeg' -ErrorAction SilentlyContinue)) {
-    [Console]::Error.WriteLine('Error: ffmpeg is not installed')
+if (-not (Test-RequiredCommand -Name 'ffmpeg')) {
     exit 1
 }
 
@@ -68,6 +91,10 @@ if ($mkvFiles.Count -eq 0) {
     [Console]::Error.WriteLine("Error: No .mkv file found in $InputDir")
     exit 1
 }
+if ($mkvFiles.Count -gt 1) {
+    [Console]::Error.WriteLine("Error: Multiple .mkv files found in $InputDir; refusing to remove directory")
+    exit 1
+}
 
 $allAssFiles = @(Get-ChildItem -LiteralPath $absInputDir -Filter '*.ass' -File)
 if ($allAssFiles.Count -eq 0) {
@@ -87,8 +114,8 @@ try {
         -hide_banner `
         -loglevel error `
         -sn `
-        -i "$inputFile" `
-        -i "$inputAssTw" `
+        -i $inputFile `
+        -i $inputAssTw `
         -map 0:v:0 `
         -map '0:a:0?' `
         -map 1:s:0 `
@@ -96,7 +123,7 @@ try {
         -disposition:s:0 default `
         -metadata:s:s:0 language=chi `
         -metadata:s:s:0 title='繁體中文' `
-        "$tmpFile"
+        $tmpFile
 
     if ($LASTEXITCODE -ne 0) {
         [Console]::Error.WriteLine("Error: ffmpeg failed with exit code $LASTEXITCODE")
@@ -107,7 +134,7 @@ try {
     Remove-Item -LiteralPath $absInputDir -Recurse -Force
 
     $size = (Get-Item -LiteralPath $outputFile).Length
-    $readableSize = ($size -ge 1GB) ? ('{0:N1}G' -f ($size / 1GB)) : (($size -ge 1MB) ? ('{0:N1}M' -f ($size / 1MB)) : ('{0:N0}K' -f ($size / 1KB)))
+    $readableSize = Format-ByteSize -ByteCount $size
     Write-Output "$(Split-Path -Leaf $outputFile) $readableSize ok"
 }
 finally {

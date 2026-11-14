@@ -4,13 +4,14 @@ This document outlines the core architecture map, git delivery invariants, and m
 
 ## 1. Quick Architecture Map
 
-| Layer                   | Path                                            | Responsibility                                                                                                                                   |
-| :---------------------- | :---------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI Tools**           | `cli/*.ps1`                                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands (symlinked to `~/.local/bin` on macOS; User `PATH` on Win11)                                   |
-| **Dotfiles & Configs**  | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                                                         |
-| **Antigravity Plugins** | `plugins/`                                      | Cross-platform toolchain, platform & web stack bundles (`common-modern-tools`, `macos-modern-tools`, `windows-modern-tools`, `modern-web-stack`) |
-| **Installers**          | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                                                   |
-| **Workspace Rules**     | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                                                                |
+| Layer                    | Path                                            | Responsibility                                                                                                                                   |
+| :----------------------- | :---------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI Tools**            | `cli/*.ps1`, `cli/helpers/`                     | Cross-platform PowerShell 7 (`pwsh`) CLI commands, shared helper module (`CliCommon.psm1`), and TypeScript helpers                               |
+| **Dotfiles & Configs**   | `configs/bash/`, `configs/zsh/`, `configs/git/` | Shell configuration parity, completions, global Git hooks, and browser extension backups                                                         |
+| **Antigravity Plugins**  | `plugins/`                                      | Cross-platform toolchain, platform & web stack bundles (`common-modern-tools`, `macos-modern-tools`, `windows-modern-tools`, `modern-web-stack`) |
+| **Installers**           | `scripts/install.sh`, `scripts/install.ps1`     | Idempotent OS environment setup (Zsh for macOS; PowerShell 5.1 & 7+ compatible for Windows 11)                                                   |
+| **Verification & Tests** | `tests/`                                        | Unified formatting/AST/lint verifier (`verify.ps1`), PowerShell contract tests, and `node:test` suites                                           |
+| **Workspace Rules**      | `.agents/rules/`                                | Modular project rules triggered via file globbing                                                                                                |
 
 ---
 
@@ -20,8 +21,8 @@ This document outlines the core architecture map, git delivery invariants, and m
   - The repository enforces a global Git hook (`~/.config/git/hooks/pre-commit`) that rejects direct commits by AI agents (`ANTIGRAVITY_AGENT=1`).
   - Agents must NEVER execute `git commit` or `git push`.
   - Mandatory workflow:
-    1. Apply code changes and verify syntax/AST.
-    2. Format modified files (`shfmt` for shell, `vpx oxfmt` for markdown/JSON/code).
+    1. Apply code changes and verify syntax/AST (or run `pwsh -NoLogo -NoProfile -File tests/verify.ps1`).
+    2. Format modified files (`shfmt` for shell, `vpx oxfmt` for markdown/JSON/code, `Invoke-Formatter` for PowerShell).
     3. Stage changes using defensive explicit paths: `git add <files>`.
     4. Output the exact `git commit -m "type(scope): concise imperative description"` command for manual execution by the user.
 - **Agent-Friendly Execution Formats**:

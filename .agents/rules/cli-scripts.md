@@ -29,10 +29,13 @@ description: Rules for managing, authoring, and verifying cross-platform PowerSh
   - Parse CLI arguments directly from `$args` (`for ($i = 0; $i -lt $args.Count; $i++) { $arg = [string]$args[$i] ... }`) rather than `[CmdletBinding()] param(...)`.
   - Avoiding `[CmdletBinding()]` prevents PowerShell's `ParameterBinder` and CommonParameters (`-WarningAction`, `-OutVariable`, `-Verbose`, `-Debug`) from colliding with short POSIX flags (`-w`, `-o`, `-v`, `-d`).
   - Support both POSIX/GNU style (`--llms`, `--quality`, `-w`, `-h`, `--help`) and PowerShell style (`-Llms`, `-Quality`, `-Width`, `-Help`) via case-insensitive regex matching (`-match`).
-- **Extensionless Shebang & Symlink Path Resolution (`Get-ScriptDirectory`)**:
+- **Extensionless Shebang & Symlink Path Resolution (`CliCommon.psm1`)**:
   - When `pwsh` executes an extensionless file via shebang on macOS/Linux (e.g., `~/.local/bin/ua`), PowerShell's engine runs it as an anonymous `ScriptBlock` and leaves `$PSScriptRoot` and `$PSCommandPath` empty (`""`).
   - Furthermore, `~/.local/bin/<cmd>` is a symlink whose parent directory is `~/.local/bin`, not `cli/`.
-  - Any script that resolves paths relative to the repository MUST resolve the physical target path via `$PSCommandPath` with `[Environment]::GetCommandLineArgs()` fallback and `[System.IO.FileInfo]::new(...).ResolveLinkTarget($true)`.
+  - Shared PowerShell CLI helpers (`Resolve-CliScriptDirectory`, `Test-RequiredCommand`, `Convert-TimeToSecond`, `ConvertTo-ValidatedInt`, `Format-ByteSize`, `Import-WindowsMachinePath`, `Invoke-YtDlpSegment`) live in `cli/helpers/CliCommon.psm1`.
+  - Scripts importing `CliCommon.psm1` resolve `$scriptDir` via `$PSScriptRoot` with `[Environment]::GetCommandLineArgs()` + `[System.IO.FileInfo]::new(...).ResolveLinkTarget($true)` fallback (note: `ResolveLinkTarget` returns `FileSystemInfo`, so always use `.FullName` with `Split-Path -Parent` rather than `.DirectoryName`), then run `Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force`.
+- **Strict CLI Flag Rejection**:
+  - Reject unknown `-*` / `--*` options and unexpected positional arguments with a clear stderr message and non-zero exit code instead of silently ignoring them.
 - **PowerShell 7.4+ Native Byte-Stream Piping**:
   - Pipe binary streams directly between external native commands (`& ffmpeg ... | & gifski ...`) relying on PowerShell 7.4+ default `PSNativeCommandPreserveBytePipe` rather than `sh -c` or `cmd.exe /c` string interpolation.
 

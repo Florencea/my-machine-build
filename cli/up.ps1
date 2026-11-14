@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 up: Check and update Node.js package dependencies and GitHub Actions exact versions with clean spinner feedback
@@ -23,13 +37,20 @@ foreach ($rawArg in $args) {
         Show-Help
         exit 0
     }
-}
-
-foreach ($cmd in @('git', 'jq', 'vp', 'vpr', 'vpx', 'yq')) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine("Error: $cmd is not installed")
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
         exit 1
     }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
+    }
+}
+
+if (-not (Test-RequiredCommand -Name 'git', 'jq', 'vp', 'vpr', 'vpx', 'yq')) {
+    exit 1
 }
 
 if (-not (Test-Path -LiteralPath 'package.json' -PathType Leaf)) {

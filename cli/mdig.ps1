@@ -27,8 +27,18 @@ foreach ($rawArg in $args) {
     if ($arg -match '^--?h(elp)?$') {
         $Help = $true
     }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
+    }
     elseif (-not $Domain) {
         $Domain = $arg
+    }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
     }
 }
 

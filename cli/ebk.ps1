@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 ebk: Backup and sync browser extension configuration files
@@ -23,48 +37,52 @@ foreach ($rawArg in $args) {
         Show-Help
         exit 0
     }
-}
-
-function Get-ScriptDirectory {
-    $scriptPath = $PSCommandPath
-    if (-not $scriptPath) {
-        $cmdArgs = [Environment]::GetCommandLineArgs()
-        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
-            $candidate = $cmdArgs[$i]
-            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-                $scriptPath = $candidate
-                break
-            }
-        }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
     }
-    if (-not $scriptPath) {
-        throw 'Unable to determine script path.'
-    }
-    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
-    $targetInfo = $fileInfo.ResolveLinkTarget($true)
-    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
-    return (Split-Path -Parent $realPath)
-}
-
-foreach ($cmd in @('git', 'jq')) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine("Error: $cmd is not installed")
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
         exit 1
     }
 }
 
-$scriptDir = Get-ScriptDirectory
+if (-not (Test-RequiredCommand -Name 'git', 'jq')) {
+    exit 1
+}
+
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptDir '..')).Path
 $configHome = Join-Path $repoRoot 'configs'
 $downloadsDir = Join-Path $HOME 'Downloads'
 $script:needPush = $false
+$script:hasError = $false
 
 function Save-CommitFile {
     param([string]$FileName)
-    & git -C $configHome add $FileName
+
+    & git -C $configHome add -- $FileName
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("Error: git add failed for $FileName")
+        $script:hasError = $true
+        return
+    }
+
     $status = (& git -C $configHome status --porcelain -- $FileName)
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("Error: git status failed for $FileName")
+        $script:hasError = $true
+        return
+    }
+
     if ($status) {
         & git -C $configHome commit -q -m "feat: Update $FileName by ebk"
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("Error: git commit failed for $FileName")
+            $script:hasError = $true
+            return
+        }
         Write-Output "Backup $FileName ok"
         $script:needPush = $true
     }
@@ -73,28 +91,26 @@ function Save-CommitFile {
     }
 }
 
-function Backup-RawFile {
-    param([string]$Pattern, [string]$TargetName)
-    $matchedFiles = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($matchedFiles.Count -gt 0) {
-        $latest = $matchedFiles[0].FullName
-        $dest = Join-Path $configHome $TargetName
-        Move-Item -LiteralPath $latest -Destination $dest -Force
-        if ($matchedFiles.Count -gt 1) {
-            foreach ($old in $matchedFiles[1..($matchedFiles.Count - 1)]) {
-                Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
-            }
-        }
-        Save-CommitFile -FileName $TargetName
-    }
-}
+function Backup-ConfigFile {
+    param(
+        [string]$Pattern,
+        [string]$TargetName,
+        [switch]$FormatJson
+    )
 
-function Backup-JsonFile {
-    param([string]$Pattern, [string]$TargetName)
-    $matchedFiles = @(Get-ChildItem -Path (Join-Path $downloadsDir $Pattern) -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($matchedFiles.Count -gt 0) {
-        $latest = $matchedFiles[0].FullName
-        $dest = Join-Path $configHome $TargetName
+    if (-not (Test-Path -LiteralPath $downloadsDir -PathType Container)) {
+        return
+    }
+
+    $matchedFiles = @(Get-ChildItem -LiteralPath $downloadsDir -Filter $Pattern -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
+    if ($matchedFiles.Count -eq 0) {
+        return
+    }
+
+    $latest = $matchedFiles[0].FullName
+    $dest = Join-Path $configHome $TargetName
+
+    if ($FormatJson) {
         $formatted = @(& jq . $latest 2>$null)
         if ($LASTEXITCODE -eq 0 -and $formatted.Count -gt 0) {
             [System.IO.File]::WriteAllText($dest, ($formatted -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
@@ -107,17 +123,34 @@ function Backup-JsonFile {
                 Remove-Item -LiteralPath $m.FullName -Force -ErrorAction SilentlyContinue
             }
         }
-        Save-CommitFile -FileName $TargetName
     }
+    else {
+        Move-Item -LiteralPath $latest -Destination $dest -Force
+        if ($matchedFiles.Count -gt 1) {
+            foreach ($old in $matchedFiles[1..($matchedFiles.Count - 1)]) {
+                Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Save-CommitFile -FileName $TargetName
 }
 
-Backup-RawFile -Pattern 'my-ublock-backup*.txt' -TargetName 'ubo-config.txt'
-Backup-JsonFile -Pattern 'my-ubol-settings*.json' -TargetName 'ubol-config.json'
-Backup-JsonFile -Pattern 'immersive-translate-config*.json' -TargetName 'immersive-translate-config.json'
-Backup-JsonFile -Pattern 'tampermonkey-backup*.*' -TargetName 'tampermonkey.json'
-Backup-JsonFile -Pattern 'tongwentang*.json' -TargetName 'tongwentang.json'
-Backup-JsonFile -Pattern 'stylus*.json' -TargetName 'stylus.json'
+Backup-ConfigFile -Pattern 'my-ublock-backup*.txt' -TargetName 'ubo-config.txt'
+Backup-ConfigFile -Pattern 'my-ubol-settings*.json' -TargetName 'ubol-config.json' -FormatJson
+Backup-ConfigFile -Pattern 'immersive-translate-config*.json' -TargetName 'immersive-translate-config.json' -FormatJson
+Backup-ConfigFile -Pattern 'tampermonkey-backup*.*' -TargetName 'tampermonkey.json' -FormatJson
+Backup-ConfigFile -Pattern 'tongwentang*.json' -TargetName 'tongwentang.json' -FormatJson
+Backup-ConfigFile -Pattern 'stylus*.json' -TargetName 'stylus.json' -FormatJson
 
 if ($script:needPush) {
     & git -C $configHome push -q
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine('Error: git push failed')
+        $script:hasError = $true
+    }
+}
+
+if ($script:hasError) {
+    exit 1
 }

@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 ua: Upgrade system packages (Homebrew / winget), update Node.js (Active LTS via Vite+), and sync git repositories
@@ -46,42 +60,25 @@ foreach ($rawArg in $args) {
     elseif ($arg -match '^--?skip-?git$') {
         $SkipGit = $true
     }
-}
-
-function Get-ScriptDirectory {
-    $scriptPath = $PSCommandPath
-    if (-not $scriptPath) {
-        $cmdArgs = [Environment]::GetCommandLineArgs()
-        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
-            $candidate = $cmdArgs[$i]
-            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-                $scriptPath = $candidate
-                break
-            }
-        }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
     }
-    if (-not $scriptPath) {
-        throw 'Unable to determine script path.'
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
     }
-    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
-    $targetInfo = $fileInfo.ResolveLinkTarget($true)
-    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
-    return (Split-Path -Parent $realPath)
 }
 
-if ($IsWindows) {
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    $env:PATH = "$userPath;$machinePath;$env:PATH"
-}
+Import-WindowsMachinePath
 
-$scriptDir = Get-ScriptDirectory
-$PROJECTS_DIR = (Resolve-Path -LiteralPath (Join-Path $scriptDir '../..')).Path
+$projectsDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir '../..')).Path
 
 # 1. Upgrade OS Packages
 if ($IsMacOS -and (-not $SkipBrew)) {
-    if (-not (Get-Command 'brew' -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine('Error: brew is not installed')
+    if (-not (Test-RequiredCommand -Name 'brew')) {
         exit 1
     }
     Push-Location $HOME
@@ -238,8 +235,7 @@ function Sync-GlobalOxfmt {
 
 # 2. Update Node.js & Vite+ Toolchain (Active LTS via vp)
 if (-not $SkipVite) {
-    if (-not (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine('Error: vp is not installed')
+    if (-not (Test-RequiredCommand -Name 'vp')) {
         exit 1
     }
 
@@ -265,9 +261,10 @@ if (-not $SkipVite) {
         & vp env clean >$null 2>&1
     }
 
-    $legacyNodeDir = Join-Path $HOME '.local/opt/node'
-    if ($IsMacOS -and (Test-Path -LiteralPath $legacyNodeDir)) {
-        Remove-Item -Path (Join-Path $HOME '.local/opt/node*') -Recurse -Force -ErrorAction SilentlyContinue
+    $legacyOptDir = Join-Path $HOME '.local/opt'
+    if ($IsMacOS -and (Test-Path -LiteralPath $legacyOptDir -PathType Container)) {
+        Get-ChildItem -LiteralPath $legacyOptDir -Filter 'node*' -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
     }
 
     Sync-GlobalOxfmt
@@ -277,7 +274,7 @@ if (-not $SkipVite) {
 
 # 3. Sync Git projects in workspace in parallel
 if (-not $SkipGit) {
-    $repos = @(Get-ChildItem -Directory -LiteralPath $PROJECTS_DIR | Where-Object {
+    $repos = @(Get-ChildItem -Directory -LiteralPath $projectsDir | Where-Object {
             Test-Path -LiteralPath (Join-Path $_.FullName '.git')
         })
 
@@ -304,7 +301,8 @@ if (-not $SkipGit) {
 
         foreach ($res in $results) {
             if (-not $res.Success) {
-                [Console]::Error.WriteLine("Sync $($res.Name) failed")
+                $errDetail = ($res.Output -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -First 1) ?? 'unknown error'
+                [Console]::Error.WriteLine("Sync $($res.Name) failed: $errDetail")
             }
             elseif ($res.Updated) {
                 Write-Output "Sync $($res.Name) updated"
@@ -319,6 +317,9 @@ if (-not $SkipGit) {
                 $upToDate = $total - $updatedCount
                 Write-Output "Sync workspace repositories ok ($updatedCount updated, $upToDate up to date)"
             }
+        }
+        else {
+            exit 1
         }
     }
 }

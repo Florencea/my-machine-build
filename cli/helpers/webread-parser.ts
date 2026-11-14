@@ -2,8 +2,9 @@
  * Clean, safe, local-first HTML-to-Markdown extractor and prompt injection sanitizer.
  * Powered by pure Node.js (Active LTS) built-in APIs via Vite+ (`vp node`).
  */
-import { parseArgs } from "node:util";
+import path from "node:path";
 import process from "node:process";
+import { parseArgs } from "node:util";
 
 export interface ParseOptions {
   url?: string;
@@ -87,6 +88,10 @@ export function stripJunkTags(html: string): string {
     .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "");
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Extracts candidate main content block from HTML.
  */
@@ -95,13 +100,9 @@ export function extractMainContent(html: string, selector?: string): string {
 
   if (selector !== undefined && selector.trim() !== "") {
     const sel = selector.trim().toLowerCase();
-    const tagMatch = new RegExp(`<(${sel})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, "i").exec(cleaned);
-    if (tagMatch !== null && tagMatch[2] !== undefined) {
-      return tagMatch[2];
-    }
-    // Also try class or id matching if specified as .class or #id
+    // Try class or id matching first if specified as .class or #id
     if (sel.startsWith(".")) {
-      const className = sel.slice(1);
+      const className = escapeRegExp(sel.slice(1));
       const classMatch = new RegExp(
         `<([a-z0-9]+)[^>]*class=["'][^"']*?\\b${className}\\b[^"']*?["'][^>]*>([\\s\\S]*?)<\\/\\1>`,
         "i",
@@ -111,7 +112,7 @@ export function extractMainContent(html: string, selector?: string): string {
       }
     }
     if (sel.startsWith("#")) {
-      const idName = sel.slice(1);
+      const idName = escapeRegExp(sel.slice(1));
       const idMatch = new RegExp(
         `<([a-z0-9]+)[^>]*id=["']${idName}["'][^>]*>([\\s\\S]*?)<\\/\\1>`,
         "i",
@@ -119,6 +120,12 @@ export function extractMainContent(html: string, selector?: string): string {
       if (idMatch !== null && idMatch[2] !== undefined) {
         return idMatch[2];
       }
+    }
+
+    const escapedTag = escapeRegExp(sel);
+    const tagMatch = new RegExp(`<(${escapedTag})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, "i").exec(cleaned);
+    if (tagMatch !== null && tagMatch[2] !== undefined) {
+      return tagMatch[2];
     }
   }
 
@@ -268,8 +275,7 @@ export function parseWebContent(input: string, options: ParseOptions = {}): stri
   return processed;
 }
 
-// CLI direct execution support via `vp node cli/helpers/webread-parser.ts`
-if (import.meta.filename === process.argv[1]) {
+async function runCli(): Promise<void> {
   const { values, positionals } = parseArgs({
     options: {
       url: { type: "string", short: "u" },
@@ -281,6 +287,19 @@ if (import.meta.filename === process.argv[1]) {
     allowPositionals: true,
   });
 
+  const rawMaxChars = values["max-chars"].trim();
+  if (!/^\d+$/.test(rawMaxChars)) {
+    process.stderr.write(`Error: --max-chars must be a positive integer (got '${rawMaxChars}')\n`);
+    process.exitCode = 1;
+    return;
+  }
+  const maxChars = Number(rawMaxChars);
+  if (!Number.isSafeInteger(maxChars) || maxChars <= 0) {
+    process.stderr.write(`Error: --max-chars must be greater than zero (got '${rawMaxChars}')\n`);
+    process.exitCode = 1;
+    return;
+  }
+
   // Read stdin
   let input = "";
   process.stdin.setEncoding("utf-8");
@@ -289,8 +308,6 @@ if (import.meta.filename === process.argv[1]) {
   }
 
   const targetUrl = values.url ?? (positionals.length > 0 ? positionals[0] : "stdin");
-  const maxChars = Number(values["max-chars"]) || DEFAULT_MAX_CHARS;
-
   const result = parseWebContent(input, {
     url: targetUrl,
     selector: values.selector,
@@ -299,5 +316,10 @@ if (import.meta.filename === process.argv[1]) {
     untrustedEnclosure: !values["no-enclosure"],
   });
 
-  process.stdout.write(result + "\n");
+  process.stdout.write(`${result}\n`);
+}
+
+// CLI direct execution support via `vp node cli/helpers/webread-parser.ts`
+if (process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1])) {
+  await runCli();
 }

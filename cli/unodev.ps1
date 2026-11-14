@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 unodev: Sync and update Node.js version in package.json engines.node for all local workspace projects
@@ -23,34 +37,20 @@ foreach ($rawArg in $args) {
         Show-Help
         exit 0
     }
-}
-
-function Get-ScriptDirectory {
-    $scriptPath = $PSCommandPath
-    if (-not $scriptPath) {
-        $cmdArgs = [Environment]::GetCommandLineArgs()
-        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
-            $candidate = $cmdArgs[$i]
-            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-                $scriptPath = $candidate
-                break
-            }
-        }
-    }
-    if (-not $scriptPath) {
-        throw 'Unable to determine script path.'
-    }
-    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
-    $targetInfo = $fileInfo.ResolveLinkTarget($true)
-    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
-    return (Split-Path -Parent $realPath)
-}
-
-foreach ($cmd in @('git', 'vp')) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        [Console]::Error.WriteLine("Error: $cmd is not installed")
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
         exit 1
     }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
+    }
+}
+
+if (-not (Test-RequiredCommand -Name 'git', 'vp')) {
+    exit 1
 }
 
 $env:VP_LOG = 'error'
@@ -58,47 +58,66 @@ $currentLocalVersion = (& vp node -v 2>$null)
 if (-not $currentLocalVersion) {
     $currentLocalVersion = (& node -v 2>$null)
 }
-$currentLocalVersion = [string]$currentLocalVersion
-$currentLocalVersion = $currentLocalVersion.Trim()
+$currentLocalVersion = ([string]$currentLocalVersion).Trim()
 Write-Output "`nnode: $currentLocalVersion`n"
 $nodeVersion = $currentLocalVersion.TrimStart('v')
 
-$scriptDir = Get-ScriptDirectory
 $projectsDir = (Resolve-Path -LiteralPath (Join-Path $scriptDir '../..')).Path
 $projects = @(Get-ChildItem -Directory -LiteralPath $projectsDir | Where-Object {
         (Test-Path -LiteralPath (Join-Path $_.FullName '.git')) -and
         (Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') -PathType Leaf)
     })
 
-$projects | ForEach-Object -Parallel {
-    $projDir = $_.FullName
-    $projName = $_.Name
-    $targetVer = $using:nodeVersion
-    $env:VP_LOG = 'error'
+$results = @($projects | ForEach-Object -Parallel {
+        $projDir = $_.FullName
+        $projName = $_.Name
+        $targetVer = $using:nodeVersion
+        $env:VP_LOG = 'error'
 
-    $oldVer = (& vp -C $projDir pm pkg get engines.node 2>$null)
-    if ($oldVer) {
-        $oldVer = ([string]$oldVer).Trim().Trim('"')
-    }
-
-    if ($oldVer -ne $targetVer) {
-        & vp -C $projDir pm pkg set "engines.node=$targetVer" >$null 2>&1
-        $status = (& git -C $projDir status --short package.json 2>$null)
-        if ($status) {
-            & git -C $projDir add package.json
-            & git -C $projDir commit -q -m "chore(node): Update engines.node $oldVer -> $targetVer"
-            if ($LASTEXITCODE -eq 0) {
-                & git -C $projDir push -q >$null 2>&1
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Output "engines.node ${projName}: $oldVer -> $targetVer ok"
-                }
-                else {
-                    [Console]::Error.WriteLine("engines.node ${projName}: failed to push")
-                }
-            }
+        $oldVer = (& vp -C $projDir pm pkg get engines.node 2>$null)
+        if ($oldVer) {
+            $oldVer = ([string]$oldVer).Trim().Trim('"')
         }
-    }
-    else {
-        Write-Output "engines.node ${projName}: $oldVer ok"
-    }
-} -ThrottleLimit 6
+
+        if ($oldVer -eq $targetVer) {
+            Write-Output "engines.node ${projName}: $oldVer ok"
+            return $true
+        }
+
+        & vp -C $projDir pm pkg set "engines.node=$targetVer" >$null 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("engines.node ${projName}: failed to update package.json")
+            return $false
+        }
+
+        $status = (& git -C $projDir status --short package.json 2>$null)
+        if (-not $status) {
+            Write-Output "engines.node ${projName}: $oldVer -> $targetVer ok"
+            return $true
+        }
+
+        & git -C $projDir add -- package.json
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("engines.node ${projName}: failed to stage package.json")
+            return $false
+        }
+
+        & git -C $projDir commit -q -m "chore(node): Update engines.node $oldVer -> $targetVer"
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("engines.node ${projName}: failed to commit")
+            return $false
+        }
+
+        & git -C $projDir push -q >$null 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("engines.node ${projName}: failed to push")
+            return $false
+        }
+
+        Write-Output "engines.node ${projName}: $oldVer -> $targetVer ok"
+        return $true
+    } -ThrottleLimit 6)
+
+if ($results -contains $false) {
+    exit 1
+}

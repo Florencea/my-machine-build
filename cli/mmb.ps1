@@ -10,6 +10,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 mmb: Open current build workspace in Visual Studio Code
@@ -23,34 +37,21 @@ foreach ($rawArg in $args) {
         Show-Help
         exit 0
     }
+    elseif ($arg.StartsWith('-')) {
+        [Console]::Error.WriteLine("Error: Unknown option $arg")
+        Show-Help
+        exit 1
+    }
+    else {
+        [Console]::Error.WriteLine("Error: Unexpected argument $arg")
+        Show-Help
+        exit 1
+    }
 }
 
-function Get-ScriptDirectory {
-    $scriptPath = $PSCommandPath
-    if (-not $scriptPath) {
-        $cmdArgs = [Environment]::GetCommandLineArgs()
-        for ($i = 1; $i -lt $cmdArgs.Count; $i++) {
-            $candidate = $cmdArgs[$i]
-            if ($candidate -and (-not $candidate.StartsWith('-')) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-                $scriptPath = $candidate
-                break
-            }
-        }
-    }
-    if (-not $scriptPath) {
-        throw 'Unable to determine script path.'
-    }
-    $fileInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $scriptPath).Path)
-    $targetInfo = $fileInfo.ResolveLinkTarget($true)
-    $realPath = $targetInfo ? $targetInfo.FullName : $fileInfo.FullName
-    return (Split-Path -Parent $realPath)
-}
-
-if (-not (Get-Command 'code' -ErrorAction SilentlyContinue)) {
-    [Console]::Error.WriteLine('Error: code is not installed')
+if (-not (Test-RequiredCommand -Name 'code')) {
     exit 1
 }
 
-$scriptDir = Get-ScriptDirectory
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptDir '..')).Path
 & code $repoRoot

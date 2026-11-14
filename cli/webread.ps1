@@ -12,6 +12,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $entryPath = [Environment]::GetCommandLineArgs() |
+        Select-Object -Skip 1 |
+        Where-Object { $_ -and (-not $_.StartsWith('-')) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if (-not $entryPath) {
+        throw 'Unable to determine script path.'
+    }
+    $entryInfo = [System.IO.FileInfo]::new((Resolve-Path -LiteralPath $entryPath).Path)
+    $scriptDir = Split-Path -Parent (($entryInfo.ResolveLinkTarget($true) ?? $entryInfo).FullName)
+}
+Import-Module -Name (Join-Path $scriptDir 'helpers' 'CliCommon.psm1') -Force
+
 function Show-Help {
     Write-Output @'
 webread: Clean, token-efficient, secure webpage and documentation reader for agents and humans.
@@ -42,43 +56,7 @@ Examples:
 '@
 }
 
-# Resolve script root (handles extensionless symlinks on macOS ~/.local/bin/webread)
-$realScriptDir = $PSScriptRoot
-if (-not $realScriptDir) {
-    try {
-        $cmdArgs = [Environment]::GetCommandLineArgs()
-        if ($cmdArgs.Length -gt 1) {
-            $rawPath = $cmdArgs[1]
-            $item = Get-Item -LiteralPath $rawPath -ErrorAction SilentlyContinue
-            if ($item) {
-                if ($item.LinkType) {
-                    $target = $item.ResolveLinkTarget($true)
-                    if ($target) {
-                        $realScriptDir = $target.DirectoryName
-                    }
-                }
-                else {
-                    $realScriptDir = $item.DirectoryName
-                }
-            }
-        }
-    }
-    catch {
-        Write-Verbose "Failed to resolve symlink script root: $($_.Exception.Message)"
-    }
-}
-if (-not $realScriptDir) {
-    $realScriptDir = [System.IO.Path]::GetDirectoryName((Get-Process -Id $PID).Path)
-}
-
-$parserScript = Join-Path $realScriptDir 'helpers' 'webread-parser.ts'
-if (-not (Test-Path -LiteralPath $parserScript)) {
-    # Fallback to search relative to current directory
-    $candidate = Join-Path (Get-Location) 'cli' 'helpers' 'webread-parser.ts'
-    if (Test-Path -LiteralPath $candidate) {
-        $parserScript = $candidate
-    }
-}
+$parserScript = Join-Path $scriptDir 'helpers' 'webread-parser.ts'
 
 $Selector = ''
 $Llms = $false
@@ -87,7 +65,7 @@ $Output = ''
 $Help = $false
 $UseJina = $false
 $NoEnclosure = $false
-$MaxChars = '64000'
+$MaxChars = 64000
 $targetUrl = ''
 
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -112,7 +90,13 @@ for ($i = 0; $i -lt $args.Count; $i++) {
             [Console]::Error.WriteLine('Error: --max-chars requires a numeric argument')
             exit 1
         }
-        $MaxChars = [string]$args[++$i]
+        try {
+            $MaxChars = ConvertTo-ValidatedInt -Value ([string]$args[++$i]) -OptionName '--max-chars' -MinValue 1
+        }
+        catch [System.ArgumentException] {
+            [Console]::Error.WriteLine("Error: $($_.Exception.Message)")
+            exit 1
+        }
     }
     elseif ($arg -match '^--?s(elector)?$') {
         if ($i + 1 -ge $args.Count) {
@@ -160,24 +144,26 @@ if ($targetUrl -notmatch '^https?://') {
 }
 
 $curlBin = $IsWindows ? 'curl.exe' : 'curl'
-$curlCmd = (Get-Command $curlBin -ErrorAction SilentlyContinue)?.Source
-if (-not $curlCmd) {
-    [Console]::Error.WriteLine("Error: $curlBin is required but not installed.")
+if (-not (Test-RequiredCommand -Name $curlBin)) {
     exit 1
 }
+$curlCmd = (Get-Command $curlBin).Source
 
 $nullDevice = $IsWindows ? 'NUL' : '/dev/null'
 $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
 function Invoke-LocalParser {
-    param([string]$RawInput, [string]$SourceUrl)
+    param(
+        [string]$RawText,
+        [string]$SourceUrl
+    )
 
-    if (Test-Path -LiteralPath $parserScript) {
+    if ((Test-Path -LiteralPath $parserScript -PathType Leaf) -and (Get-Command 'vp' -ErrorAction SilentlyContinue)) {
         $parserArgs = @(
             'node',
             $parserScript,
             '--url', $SourceUrl,
-            '--max-chars', $MaxChars
+            '--max-chars', [string]$MaxChars
         )
         if ($Selector) {
             $parserArgs += @('--selector', $Selector)
@@ -189,22 +175,35 @@ function Invoke-LocalParser {
             $parserArgs += @('--no-enclosure')
         }
 
-        # Pipe stdin to vp node parser
-        $output = $RawInput | & vp @parserArgs
+        $output = @($RawText | & vp @parserArgs)
         if ($LASTEXITCODE -eq 0) {
             return ($output -join "`n")
         }
     }
 
-    # Fallback to direct output if parser is not available
-    [Console]::Error.WriteLine('Notice: webread-parser.ts not found, outputting direct fetch.')
-    return $RawInput
+    [Console]::Error.WriteLine('Notice: webread-parser.ts unavailable or failed, outputting direct fetch.')
+    return $RawText
+}
+
+function Invoke-CurlText {
+    param(
+        [string[]]$CurlArgs
+    )
+
+    $lines = @(& $curlCmd @CurlArgs 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) {
+        return $null
+    }
+    return ($lines -join "`n")
 }
 
 function Get-WebreadContent {
-    param([string]$UrlToFetch, [string]$CurrentMode)
+    param(
+        [string]$UrlToFetch,
+        [string]$CurrentMode
+    )
 
-    # 1. Probing /llms-full.txt or /llms.txt
+    # 1. Probe /llms-full.txt or /llms.txt directly from origin
     if ($CurrentMode -eq 'llms') {
         try {
             $uri = [System.Uri]$UrlToFetch
@@ -215,59 +214,59 @@ function Get-WebreadContent {
             return $null
         }
 
-        $fullTxt = "$origin/llms-full.txt"
-        $stdTxt = "$origin/llms.txt"
-
-        $statusCode = & $curlCmd -sL -w '%{http_code}' -o $nullDevice "$fullTxt"
-        if ($statusCode -eq '200') {
-            $content = & $curlCmd -sL -A $userAgent "$fullTxt"
-            return (Invoke-LocalParser -RawInput $content -SourceUrl $fullTxt)
-        }
-
-        $statusCode = & $curlCmd -sL -w '%{http_code}' -o $nullDevice "$stdTxt"
-        if ($statusCode -eq '200') {
-            $content = & $curlCmd -sL -A $userAgent "$stdTxt"
-            return (Invoke-LocalParser -RawInput $content -SourceUrl $stdTxt)
+        foreach ($candidatePath in @('/llms-full.txt', '/llms.txt')) {
+            $probeUrl = "$origin$candidatePath"
+            $statusCode = (& $curlCmd -sL -w '%{http_code}' -o $nullDevice $probeUrl)
+            if ($statusCode -eq '200') {
+                $content = Invoke-CurlText -CurlArgs @('-fsL', '-A', $userAgent, $probeUrl)
+                if ($null -ne $content) {
+                    return (Invoke-LocalParser -RawText $content -SourceUrl $probeUrl)
+                }
+            }
         }
 
         [Console]::Error.WriteLine("Notice: Neither /llms-full.txt nor /llms.txt found on $origin, falling back to local reader...")
-        $CurrentMode = 'local'
     }
 
     # 2. Opt-in External Jina Reader
     if ($UseJina) {
         [Console]::Error.WriteLine('Notice: Using external Jina Reader service (r.jina.ai)...')
         $jinaUrl = "https://r.jina.ai/$UrlToFetch"
-        $content = & $curlCmd -sL --max-time 15 -H 'X-No-Cache: true' "$jinaUrl" 2>$null
-
-        if ($LASTEXITCODE -eq 0 -and $content -and ($content -notmatch 'Request failed with status code')) {
-            return (Invoke-LocalParser -RawInput $content -SourceUrl $UrlToFetch)
+        $content = Invoke-CurlText -CurlArgs @('-fsL', '--max-time', '15', '-H', 'X-No-Cache: true', $jinaUrl)
+        if ($null -ne $content -and ($content -notmatch 'Request failed with status code')) {
+            return (Invoke-LocalParser -RawText $content -SourceUrl $UrlToFetch)
         }
         [Console]::Error.WriteLine('Notice: External Jina Reader unavailable, falling back to local reader...')
     }
 
     # 3. Local-First Safe Fetch (Default)
-    $fetchedHtml = & $curlCmd -sL --max-time 20 -A $userAgent "$UrlToFetch" 2>$null
-    if (-not $fetchedHtml) {
+    $fetchedHtml = Invoke-CurlText -CurlArgs @('-fsL', '--max-time', '20', '-A', $userAgent, $UrlToFetch)
+    if ($null -eq $fetchedHtml) {
         [Console]::Error.WriteLine("Error: Failed to fetch content from $UrlToFetch")
         return $null
     }
 
-    return (Invoke-LocalParser -RawInput $fetchedHtml -SourceUrl $UrlToFetch)
+    return (Invoke-LocalParser -RawText $fetchedHtml -SourceUrl $UrlToFetch)
 }
 
 $activeMode = $Llms ? 'llms' : 'local'
 $result = Get-WebreadContent -UrlToFetch $targetUrl -CurrentMode $activeMode
 
-if (-not $result) {
+if ([string]::IsNullOrEmpty($result)) {
     exit 1
 }
 
 if ($Output) {
+    $absOut = [System.IO.Path]::GetFullPath($Output, $PWD.ProviderPath)
+    $outDir = Split-Path -Parent $absOut
+    if ($outDir -and (-not (Test-Path -LiteralPath $outDir -PathType Container))) {
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    }
     $newline = $IsWindows ? "`r`n" : "`n"
-    [System.IO.File]::WriteAllText($Output, ($result -join $newline), [System.Text.UTF8Encoding]::new($false))
+    $normalizedText = (($result -replace "`r`n", "`n") -replace "`n", $newline).TrimEnd("`r", "`n") + $newline
+    [System.IO.File]::WriteAllText($absOut, $normalizedText, [System.Text.UTF8Encoding]::new($false))
     Write-Output "Content saved to $Output"
 }
 else {
-    $result
+    Write-Output $result
 }
